@@ -1,6 +1,12 @@
+# The prefix for all commands
+# It has to be prefixed with ! in matrix to be recognised
+prefix: 'rt'
 # RT base URL
 url: https://example.com/rt
 # RT Username
 user: rtlinks
 # RT Password
 pass: secret
+# The list of user IDs who are allowed to modify stuff.
+whitelist:
+- '@user:example.com'
