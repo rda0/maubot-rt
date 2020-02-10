@@ -61,8 +61,15 @@ class RTLinksPlugin(Plugin):
 
     async def edit_ticket(self, number: str, status: str) -> None:
         api_edit = '{}ticket/{}/edit'.format(self.api, number)
-        data = {**self.post_data, **{'content': 'Status: {}'.format(status)}}
+        content = {'content': 'Status: {}'.format(status)}
+        data = {**self.post_data, **content}
         await self.http.post(api_edit, data=data, headers=self.headers)
+
+    async def comment_ticket(self, number: str, comment: str) -> None:
+        api_comment = '{}ticket/{}/comment'.format(self.api, number)
+        content = {'content': 'id: {}\nAction: comment\nText: {}'.format(number, comment)}
+        data = {**self.post_data, **content}
+        await self.http.post(api_comment, data=data, headers=self.headers)
 
     @command.passive("((^| )([rR][tT]#?))([0-9]{6})", multiple=True)
     async def handler(self, evt: MessageEvent, subs: List[Tuple[str, str]]) -> None:
@@ -152,3 +159,14 @@ class RTLinksPlugin(Plugin):
             return
         await evt.mark_read()
         await evt.reply('😂 lol, this is your job!')
+
+    @rt.subcommand("comment", help="Add a comment.")
+    @command.argument("number", "ticket number", parser=str)
+    @command.argument("comment", "comment text", pass_raw=True)
+    async def comment(self, evt: MessageEvent, number: str, comment: str) -> None:
+        if not await self.can_manage(evt) or not self.is_valid_number(number):
+            return
+        await evt.mark_read()
+        await self.comment_ticket(number, comment)
+        markdown_link = await self.get_markdown_link(number)
+        await evt.respond('{} comment added'.format(markdown_link))
