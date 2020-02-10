@@ -117,7 +117,7 @@ class RTLinksPlugin(Plugin):
     async def rt(self) -> None:
         pass
 
-    @rt.subcommand("properties", help="Show all ticket properties.")
+    @rt.subcommand("properties", aliases=("p", "prop"), help="Show all ticket properties.")
     @command.argument("number", "ticket number", pass_raw=True)
     async def properties(self, evt: MessageEvent, number: str) -> None:
         if not await self.can_manage(evt) or not self.is_valid_number(number):
@@ -129,7 +129,7 @@ class RTLinksPlugin(Plugin):
         markdown = '{} properties:  \n{}'.format(markdown_link, '  \n'.join(properties_list))
         await evt.respond(markdown)
 
-    @rt.subcommand("resolve", help="Mark the ticket as resolved.")
+    @rt.subcommand("resolve", aliases=("r", "res"), help="Mark the ticket as resolved.")
     @command.argument("number", "ticket number", pass_raw=True)
     async def resolve(self, evt: MessageEvent, number: str) -> None:
         if not await self.can_manage(evt) or not self.is_valid_number(number):
@@ -139,7 +139,7 @@ class RTLinksPlugin(Plugin):
         markdown_link = await self.get_markdown_link(number)
         await evt.respond('{} resolved'.format(markdown_link))
 
-    @rt.subcommand("open", help="Mark the ticket as open.")
+    @rt.subcommand("open", aliases=("o", "op"),help="Mark the ticket as open.")
     @command.argument("number", "ticket number", pass_raw=True)
     async def open(self, evt: MessageEvent, number: str) -> None:
         if not await self.can_manage(evt) or not self.is_valid_number(number):
@@ -149,7 +149,7 @@ class RTLinksPlugin(Plugin):
         markdown_link = await self.get_markdown_link(number)
         await evt.respond('{} opened'.format(markdown_link))
 
-    @rt.subcommand("stall", help="Mark the ticket as stalled.")
+    @rt.subcommand("stall", aliases=("st", "sta"), help="Mark the ticket as stalled.")
     @command.argument("number", "ticket number", pass_raw=True)
     async def stall(self, evt: MessageEvent, number: str) -> None:
         if not await self.can_manage(evt) or not self.is_valid_number(number):
@@ -159,7 +159,7 @@ class RTLinksPlugin(Plugin):
         markdown_link = await self.get_markdown_link(number)
         await evt.respond('{} stalled'.format(markdown_link))
 
-    @rt.subcommand("delete", help="Mark the ticket as deleted.")
+    @rt.subcommand("delete", aliases=("d", "del"), help="Mark the ticket as deleted.")
     @command.argument("number", "ticket number", pass_raw=True)
     async def delete(self, evt: MessageEvent, number: str) -> None:
         if not await self.can_manage(evt) or not self.is_valid_number(number):
@@ -176,7 +176,7 @@ class RTLinksPlugin(Plugin):
         await evt.mark_read()
         await evt.reply('😂 lol, this is your job!')
 
-    @rt.subcommand("comment", help="Add a comment.")
+    @rt.subcommand("comment", aliases=("c", "com"), help="Add a comment.")
     @command.argument("number", "ticket number", parser=str)
     @command.argument("comment", "comment text", pass_raw=True)
     async def comment(self, evt: MessageEvent, number: str, comment: str) -> None:
@@ -187,7 +187,8 @@ class RTLinksPlugin(Plugin):
         markdown_link = await self.get_markdown_link(number)
         await evt.respond('{} comment added'.format(markdown_link))
 
-    @rt.subcommand("history", help="Get a list of all history items for a given ticket.")
+    @rt.subcommand("history", aliases=("h", "hist"),
+                   help="Get a list of all history items for a given ticket.")
     @command.argument("number", "ticket number", pass_raw=True)
     async def history(self, evt: MessageEvent, number: str) -> None:
         if not await self.can_manage(evt) or not self.is_valid_number(number):
@@ -199,7 +200,8 @@ class RTLinksPlugin(Plugin):
         markdown = '{} history entries:  \n{}'.format(markdown_link, '  \n'.join(history_list))
         await evt.respond(markdown)
 
-    @rt.subcommand("entry", help="Gets the history information for a single history entry.")
+    @rt.subcommand("entry", aliases=("e", "ent"),
+                   help="Gets the history information for a single history entry.")
     @command.argument("number", "ticket number", parser=str)
     @command.argument("entry", "history entry number", parser=str)
     async def entry(self, evt: MessageEvent, number: str, entry: str) -> None:
@@ -213,7 +215,8 @@ class RTLinksPlugin(Plugin):
                                                        '  \n'.join(entry_list))
         await evt.respond(markdown)
 
-    @rt.subcommand("last", help="Gets the history information for the last history entry.")
+    @rt.subcommand("last", aliases=("l", "la"),
+                   help="Gets the history information for the last history entry.")
     @command.argument("number", "ticket number", parser=str)
     async def last(self, evt: MessageEvent, number: str) -> None:
         if not await self.can_manage(evt) or not self.is_valid_number(number):
@@ -228,7 +231,7 @@ class RTLinksPlugin(Plugin):
                                                        '  \n'.join(entry_list))
         await evt.respond(markdown)
 
-    @rt.subcommand("show", help="Show all information about the ticket.")
+    @rt.subcommand("show", aliases=("s", "sh"), help="Show all information about the ticket.")
     @command.argument("number", "ticket number", parser=str)
     async def show(self, evt: MessageEvent, number: str) -> None:
         if not await self.can_manage(evt) or not self.is_valid_number(number):
