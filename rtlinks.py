@@ -52,7 +52,7 @@ class RTLinksPlugin(Plugin):
         markdown = "[rt#{}]({})".format(number, link)
         return markdown
 
-    async def _show(self, number: str) -> dict:
+    async def _properties(self, number: str) -> dict:
         await self.http.post(self.api, data=self.post_data, headers=self.headers)
         api_show = '{}ticket/{}/show'.format(self.api, number)
         async with self.http.get(api_show, headers=self.headers) as response:
@@ -117,13 +117,13 @@ class RTLinksPlugin(Plugin):
     async def rt(self) -> None:
         pass
 
-    @rt.subcommand("show", help="Show all ticket properties.")
+    @rt.subcommand("properties", help="Show all ticket properties.")
     @command.argument("number", "ticket number", pass_raw=True)
-    async def show(self, evt: MessageEvent, number: str) -> None:
+    async def properties(self, evt: MessageEvent, number: str) -> None:
         if not await self.can_manage(evt) or not self.is_valid_number(number):
             return
         await evt.mark_read()
-        properties_dict = await self._show(number)
+        properties_dict = await self._properties(number)
         properties_list = ["{}: {}".format(k, v) for k, v in properties_dict.items()]
         markdown_link = await self.get_markdown_link(number)
         markdown = '{} properties:  \n{}'.format(markdown_link, '  \n'.join(properties_list))
@@ -226,4 +226,22 @@ class RTLinksPlugin(Plugin):
         markdown_link = await self.get_markdown_link(number)
         markdown = '{} history entry {}:  \n{}'.format(markdown_link, entry,
                                                        '  \n'.join(entry_list))
+        await evt.respond(markdown)
+
+    @rt.subcommand("show", help="Show all information about the ticket.")
+    @command.argument("number", "ticket number", parser=str)
+    async def show(self, evt: MessageEvent, number: str) -> None:
+        if not await self.can_manage(evt) or not self.is_valid_number(number):
+            return
+        await evt.mark_read()
+        properties_dict = await self._properties(number)
+        properties_list = ["{}: {}".format(k, v) for k, v in properties_dict.items()]
+        markdown_link = await self.get_markdown_link(number)
+        markdown = '{} properties:  \n{}  \n\n'.format(markdown_link, '  \n'.join(properties_list))
+        history_dict = await self._history(number)
+        for entry in history_dict.keys():
+            entry_dict = await self._entry(number, entry)
+            entry_list = ["{}: {}".format(k, v) for k, v in entry_dict.items()]
+            markdown += '{} history entry {}:  \n{}  \n\n'.format(markdown_link, entry,
+                                                                  '  \n'.join(entry_list))
         await evt.respond(markdown)
