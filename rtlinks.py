@@ -94,6 +94,22 @@ class RTLinksPlugin(Plugin):
     async def rt(self) -> None:
         pass
 
+    @rt.subcommand("show", help="Show all ticket properties.")
+    @command.argument("number", "ticket number", pass_raw=True)
+    async def show(self, evt: MessageEvent, number: str) -> None:
+        if not await self.can_manage(evt):
+            return
+        await evt.mark_read()
+        await self.show_ticket(number)
+        properties_dict = await self.show_ticket(number)
+        properties_list = ["{}: {}".format(k, v) for k, v in properties_dict.items()]
+        markdown_link = await self.get_markdown_link(number)
+        markdown = '{} properties:  \n{}'.format(
+            markdown_link,
+            '  \n'.join(properties_list)
+        )
+        await evt.respond(markdown)
+
     @rt.subcommand("resolve", help="Mark the ticket as resolved.")
     @command.argument("number", "ticket number", pass_raw=True)
     async def resolve(self, evt: MessageEvent, number: str) -> None:
