@@ -46,7 +46,12 @@ class RTLinksPlugin(Plugin):
             return True
         return False
 
-    async def show_ticket(self, number: str) -> dict:
+    async def get_markdown_link(self, number: str) -> str:
+        link = "{}/Ticket/Display.html?id={}".format(self.config['url'], number)
+        markdown = "[rt#{}]({})".format(number, link)
+        return markdown
+
+    async def show(self, number: str) -> dict:
         await self.http.post(self.api, data=self.post_data, headers=self.headers)
         api_show = '{}ticket/{}/show'.format(self.api, number)
         async with self.http.get(api_show, headers=self.headers) as response:
@@ -54,18 +59,13 @@ class RTLinksPlugin(Plugin):
         ticket = dict(self.regex_properties.findall(content))
         return ticket
 
-    async def get_markdown_link(self, number: str) -> str:
-        link = "{}/Ticket/Display.html?id={}".format(self.config['url'], number)
-        markdown = "[rt#{}]({})".format(number, link)
-        return markdown
-
-    async def edit_ticket(self, number: str, status: str) -> None:
+    async def edit(self, number: str, status: str) -> None:
         api_edit = '{}ticket/{}/edit'.format(self.api, number)
         content = {'content': 'Status: {}'.format(status)}
         data = {**self.post_data, **content}
         await self.http.post(api_edit, data=data, headers=self.headers)
 
-    async def comment_ticket(self, number: str, comment: str) -> None:
+    async def comment(self, number: str, comment: str) -> None:
         api_comment = '{}ticket/{}/comment'.format(self.api, number)
         content = {'content': 'id: {}\nAction: comment\nText: {}'.format(number, comment)}
         data = {**self.post_data, **content}
@@ -106,8 +106,7 @@ class RTLinksPlugin(Plugin):
         if not await self.can_manage(evt) or not self.is_valid_number(number):
             return
         await evt.mark_read()
-        await self.show_ticket(number)
-        properties_dict = await self.show_ticket(number)
+        properties_dict = await self.show(number)
         properties_list = ["{}: {}".format(k, v) for k, v in properties_dict.items()]
         markdown_link = await self.get_markdown_link(number)
         markdown = '{} properties:  \n{}'.format(markdown_link, '  \n'.join(properties_list))
@@ -119,7 +118,7 @@ class RTLinksPlugin(Plugin):
         if not await self.can_manage(evt) or not self.is_valid_number(number):
             return
         await evt.mark_read()
-        await self.edit_ticket(number, 'resolved')
+        await self.edit(number, 'resolved')
         markdown_link = await self.get_markdown_link(number)
         await evt.respond('{} resolved'.format(markdown_link))
 
@@ -129,7 +128,7 @@ class RTLinksPlugin(Plugin):
         if not await self.can_manage(evt) or not self.is_valid_number(number):
             return
         await evt.mark_read()
-        await self.edit_ticket(number, 'open')
+        await self.edit(number, 'open')
         markdown_link = await self.get_markdown_link(number)
         await evt.respond('{} opened'.format(markdown_link))
 
@@ -139,7 +138,7 @@ class RTLinksPlugin(Plugin):
         if not await self.can_manage(evt) or not self.is_valid_number(number):
             return
         await evt.mark_read()
-        await self.edit_ticket(number, 'stalled')
+        await self.edit(number, 'stalled')
         markdown_link = await self.get_markdown_link(number)
         await evt.respond('{} stalled'.format(markdown_link))
 
@@ -149,7 +148,7 @@ class RTLinksPlugin(Plugin):
         if not await self.can_manage(evt) or not self.is_valid_number(number):
             return
         await evt.mark_read()
-        await self.edit_ticket(number, 'deleted')
+        await self.edit(number, 'deleted')
         markdown_link = await self.get_markdown_link(number)
         await evt.respond('{} deleted'.format(markdown_link))
 
@@ -167,6 +166,6 @@ class RTLinksPlugin(Plugin):
         if not await self.can_manage(evt) or not self.is_valid_number(number):
             return
         await evt.mark_read()
-        await self.comment_ticket(number, comment)
+        await self.comment(number, comment)
         markdown_link = await self.get_markdown_link(number)
         await evt.respond('{} comment added'.format(markdown_link))
