@@ -18,7 +18,8 @@ class Config(BaseProxyConfig):
 class RTLinksPlugin(Plugin):
     prefix: str
     whitelist: Set[UserID]
-    regex = re.compile(r'([a-zA-z]+): (.+)')
+    regex_properties = re.compile(r'([a-zA-z]+): (.+)')
+    regex_number = re.compile(r'[0-9]{6}')
 
     async def start(self) -> None:
         #await super().start()
@@ -38,6 +39,11 @@ class RTLinksPlugin(Plugin):
             return True
         return False
 
+    def is_valid_number(self, number: str) -> bool:
+        if self.regex_number.match(number):
+            return True
+        return False
+
     async def show_ticket(self, number: str) -> dict:
         headers = {"User-agent": "rtlinksmaubot"}
         api = '{}/REST/1.0/'.format(self.config['url'])
@@ -46,7 +52,7 @@ class RTLinksPlugin(Plugin):
         api_show = '{}ticket/{}/show'.format(api, number)
         async with self.http.get(api_show, headers=headers) as response:
             content = await response.text()
-        ticket = dict(self.regex.findall(content))
+        ticket = dict(self.regex_properties.findall(content))
         return ticket
 
     async def get_markdown_link(self, number: str) -> str:
@@ -97,7 +103,7 @@ class RTLinksPlugin(Plugin):
     @rt.subcommand("show", help="Show all ticket properties.")
     @command.argument("number", "ticket number", pass_raw=True)
     async def show(self, evt: MessageEvent, number: str) -> None:
-        if not await self.can_manage(evt):
+        if not await self.can_manage(evt) or not self.is_valid_number(number):
             return
         await evt.mark_read()
         await self.show_ticket(number)
@@ -113,9 +119,46 @@ class RTLinksPlugin(Plugin):
     @rt.subcommand("resolve", help="Mark the ticket as resolved.")
     @command.argument("number", "ticket number", pass_raw=True)
     async def resolve(self, evt: MessageEvent, number: str) -> None:
-        if not await self.can_manage(evt):
+        if not await self.can_manage(evt) or not self.is_valid_number(number):
             return
         await evt.mark_read()
         await self.edit_ticket(number, 'resolved')
         markdown_link = await self.get_markdown_link(number)
         await evt.respond('{} resolved'.format(markdown_link))
+
+    @rt.subcommand("open", help="Mark the ticket as open.")
+    @command.argument("number", "ticket number", pass_raw=True)
+    async def open(self, evt: MessageEvent, number: str) -> None:
+        if not await self.can_manage(evt) or not self.is_valid_number(number):
+            return
+        await evt.mark_read()
+        await self.edit_ticket(number, 'open')
+        markdown_link = await self.get_markdown_link(number)
+        await evt.respond('{} opened'.format(markdown_link))
+
+    @rt.subcommand("stall", help="Mark the ticket as stalled.")
+    @command.argument("number", "ticket number", pass_raw=True)
+    async def stall(self, evt: MessageEvent, number: str) -> None:
+        if not await self.can_manage(evt) or not self.is_valid_number(number):
+            return
+        await evt.mark_read()
+        await self.edit_ticket(number, 'stalled')
+        markdown_link = await self.get_markdown_link(number)
+        await evt.respond('{} stalled'.format(markdown_link))
+
+    @rt.subcommand("delete", help="Mark the ticket as deleted.")
+    @command.argument("number", "ticket number", pass_raw=True)
+    async def delete(self, evt: MessageEvent, number: str) -> None:
+        if not await self.can_manage(evt) or not self.is_valid_number(number):
+            return
+        await evt.mark_read()
+        await self.edit_ticket(number, 'deleted')
+        markdown_link = await self.get_markdown_link(number)
+        await evt.respond('{} deleted'.format(markdown_link))
+
+    @rt.subcommand("autoresolve", help="Enable automatic ticket resolve mode.")
+    async def autoresolve(self, evt: MessageEvent) -> None:
+        if not await self.can_manage(evt):
+            return
+        await evt.mark_read()
+        await evt.reply('😂 lol, this is your job!')
