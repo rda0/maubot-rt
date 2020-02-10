@@ -74,7 +74,7 @@ class RTLinksPlugin(Plugin):
             api_show = '{}ticket/{}/show'.format(self.api, number)
             async with self.http.get(api_show, headers=self.headers) as response:
                 content = await response.text()
-            ticket = dict(self.regex.findall(content))
+            ticket = dict(self.regex_properties.findall(content))
             markdown_link = await self.get_markdown_link(number)
             markdown = "{} ({}) is **{}** in **{}** from {}".format(
                 markdown_link,
