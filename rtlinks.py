@@ -19,8 +19,9 @@ class RTLinksPlugin(Plugin):
     prefix: str
     whitelist: Set[UserID]
     headers = {"User-agent": "rtlinksmaubot"}
-    regex_properties = re.compile(r'([a-zA-z]+): (.+)')
     regex_number = re.compile(r'[0-9]{6}')
+    regex_properties = re.compile(r'([a-zA-z]+): (.+)')
+    regex_history = re.compile(r'([0-9]+): (.+)')
 
     async def start(self) -> None:
         self.on_external_config_update()
@@ -51,7 +52,7 @@ class RTLinksPlugin(Plugin):
         markdown = "[rt#{}]({})".format(number, link)
         return markdown
 
-    async def show(self, number: str) -> dict:
+    async def _show(self, number: str) -> dict:
         await self.http.post(self.api, data=self.post_data, headers=self.headers)
         api_show = '{}ticket/{}/show'.format(self.api, number)
         async with self.http.get(api_show, headers=self.headers) as response:
@@ -59,17 +60,33 @@ class RTLinksPlugin(Plugin):
         ticket = dict(self.regex_properties.findall(content))
         return ticket
 
-    async def edit(self, number: str, status: str) -> None:
+    async def _edit(self, number: str, status: str) -> None:
         api_edit = '{}ticket/{}/edit'.format(self.api, number)
         content = {'content': 'Status: {}'.format(status)}
         data = {**self.post_data, **content}
         await self.http.post(api_edit, data=data, headers=self.headers)
 
-    async def comment(self, number: str, comment: str) -> None:
+    async def _comment(self, number: str, comment: str) -> None:
         api_comment = '{}ticket/{}/comment'.format(self.api, number)
         content = {'content': 'id: {}\nAction: comment\nText: {}'.format(number, comment)}
         data = {**self.post_data, **content}
         await self.http.post(api_comment, data=data, headers=self.headers)
+
+    async def _history(self, number: str) -> dict:
+        await self.http.post(self.api, data=self.post_data, headers=self.headers)
+        api_history = '{}ticket/{}/history'.format(self.api, number)
+        async with self.http.get(api_history, headers=self.headers) as response:
+            content = await response.text()
+        ticket = dict(self.regex_history.findall(content))
+        return ticket
+
+    async def _entry(self, number: str, entry: str) -> dict:
+        await self.http.post(self.api, data=self.post_data, headers=self.headers)
+        api_entry = '{}ticket/{}/history/id/{}'.format(self.api, number, entry)
+        async with self.http.get(api_entry, headers=self.headers) as response:
+            content = await response.text()
+        ticket = dict(self.regex_properties.findall(content))
+        return ticket
 
     @command.passive("((^| )([rR][tT]#?))([0-9]{6})", multiple=True)
     async def handler(self, evt: MessageEvent, subs: List[Tuple[str, str]]) -> None:
@@ -106,7 +123,7 @@ class RTLinksPlugin(Plugin):
         if not await self.can_manage(evt) or not self.is_valid_number(number):
             return
         await evt.mark_read()
-        properties_dict = await self.show(number)
+        properties_dict = await self._show(number)
         properties_list = ["{}: {}".format(k, v) for k, v in properties_dict.items()]
         markdown_link = await self.get_markdown_link(number)
         markdown = '{} properties:  \n{}'.format(markdown_link, '  \n'.join(properties_list))
@@ -118,7 +135,7 @@ class RTLinksPlugin(Plugin):
         if not await self.can_manage(evt) or not self.is_valid_number(number):
             return
         await evt.mark_read()
-        await self.edit(number, 'resolved')
+        await self._edit(number, 'resolved')
         markdown_link = await self.get_markdown_link(number)
         await evt.respond('{} resolved'.format(markdown_link))
 
@@ -128,7 +145,7 @@ class RTLinksPlugin(Plugin):
         if not await self.can_manage(evt) or not self.is_valid_number(number):
             return
         await evt.mark_read()
-        await self.edit(number, 'open')
+        await self._edit(number, 'open')
         markdown_link = await self.get_markdown_link(number)
         await evt.respond('{} opened'.format(markdown_link))
 
@@ -138,7 +155,7 @@ class RTLinksPlugin(Plugin):
         if not await self.can_manage(evt) or not self.is_valid_number(number):
             return
         await evt.mark_read()
-        await self.edit(number, 'stalled')
+        await self._edit(number, 'stalled')
         markdown_link = await self.get_markdown_link(number)
         await evt.respond('{} stalled'.format(markdown_link))
 
@@ -148,7 +165,7 @@ class RTLinksPlugin(Plugin):
         if not await self.can_manage(evt) or not self.is_valid_number(number):
             return
         await evt.mark_read()
-        await self.edit(number, 'deleted')
+        await self._edit(number, 'deleted')
         markdown_link = await self.get_markdown_link(number)
         await evt.respond('{} deleted'.format(markdown_link))
 
@@ -166,6 +183,47 @@ class RTLinksPlugin(Plugin):
         if not await self.can_manage(evt) or not self.is_valid_number(number):
             return
         await evt.mark_read()
-        await self.comment(number, comment)
+        await self._comment(number, comment)
         markdown_link = await self.get_markdown_link(number)
         await evt.respond('{} comment added'.format(markdown_link))
+
+    @rt.subcommand("history", help="Get a list of all history items for a given ticket.")
+    @command.argument("number", "ticket number", pass_raw=True)
+    async def history(self, evt: MessageEvent, number: str) -> None:
+        if not await self.can_manage(evt) or not self.is_valid_number(number):
+            return
+        await evt.mark_read()
+        history_dict = await self._history(number)
+        history_list = ["{}: {}".format(k, v) for k, v in history_dict.items()]
+        markdown_link = await self.get_markdown_link(number)
+        markdown = '{} history entries:  \n{}'.format(markdown_link, '  \n'.join(history_list))
+        await evt.respond(markdown)
+
+    @rt.subcommand("entry", help="Gets the history information for a single history entry.")
+    @command.argument("number", "ticket number", parser=str)
+    @command.argument("entry", "history entry number", parser=str)
+    async def entry(self, evt: MessageEvent, number: str, entry: str) -> None:
+        if not await self.can_manage(evt) or not self.is_valid_number(number):
+            return
+        await evt.mark_read()
+        entry_dict = await self._entry(number, entry)
+        entry_list = ["{}: {}".format(k, v) for k, v in entry_dict.items()]
+        markdown_link = await self.get_markdown_link(number)
+        markdown = '{} history entry {}:  \n{}'.format(markdown_link, entry,
+                                                       '  \n'.join(entry_list))
+        await evt.respond(markdown)
+
+    @rt.subcommand("last", help="Gets the history information for the last history entry.")
+    @command.argument("number", "ticket number", parser=str)
+    async def last(self, evt: MessageEvent, number: str) -> None:
+        if not await self.can_manage(evt) or not self.is_valid_number(number):
+            return
+        await evt.mark_read()
+        history_dict = await self._history(number)
+        entry = max(history_dict, key=int)
+        entry_dict = await self._entry(number, entry)
+        entry_list = ["{}: {}".format(k, v) for k, v in entry_dict.items()]
+        markdown_link = await self.get_markdown_link(number)
+        markdown = '{} history entry {}:  \n{}'.format(markdown_link, entry,
+                                                       '  \n'.join(entry_list))
+        await evt.respond(markdown)
