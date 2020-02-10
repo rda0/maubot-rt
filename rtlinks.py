@@ -38,6 +38,30 @@ class RTLinksPlugin(Plugin):
             return True
         return False
 
+    async def show_ticket(self, number: str) -> dict:
+        headers = {"User-agent": "rtlinksmaubot"}
+        api = '{}/REST/1.0/'.format(self.config['url'])
+        data = {'user': self.config['user'], 'pass': self.config['pass']}
+        await self.http.post(api, data=data, headers=headers)
+        api_show = '{}ticket/{}/show'.format(api, number)
+        async with self.http.get(api_show, headers=headers) as response:
+            content = await response.text()
+        ticket = dict(self.regex.findall(content))
+        return ticket
+
+    async def get_markdown_link(self, number: str) -> str:
+        link = "{}/Ticket/Display.html?id={}".format(self.config['url'], number)
+        markdown = "[rt#{}]({})".format(number, link)
+        return markdown
+
+    async def edit_ticket(self, number: str, status: str) -> None:
+        headers = {"User-agent": "rtlinksmaubot"}
+        api = '{}/REST/1.0/'.format(self.config['url'])
+        api_edit = '{}ticket/{}/edit'.format(api, number)
+        data = {'user': self.config['user'], 'pass': self.config['pass'],
+                'content': 'Status: resolved'}
+        await self.http.post(api_edit, data=data, headers=headers)
+
     @command.passive("((^| )([rR][tT]#?))([0-9]{6})", multiple=True)
     async def handler(self, evt: MessageEvent, subs: List[Tuple[str, str]]) -> None:
         await evt.mark_read()
@@ -52,10 +76,9 @@ class RTLinksPlugin(Plugin):
             async with self.http.get(api_show, headers=headers) as response:
                 content = await response.text()
             ticket = dict(self.regex.findall(content))
-            link = "{}/Ticket/Display.html?id={}".format(self.config['url'], number)
-            markdown = "[rt#{}]({}) ({}) is **{}** in **{}** from {}".format(
-                number,
-                link,
+            markdown_link = await self.get_markdown_link(number)
+            markdown = "{} ({}) is **{}** in **{}** from {}".format(
+                markdown_link,
                 ticket['Subject'],
                 ticket['Status'],
                 ticket['Queue'],
@@ -77,10 +100,6 @@ class RTLinksPlugin(Plugin):
         if not await self.can_manage(evt):
             return
         await evt.mark_read()
-        headers = {"User-agent": "rtlinksmaubot"}
-        api = '{}/REST/1.0/'.format(self.config['url'])
-        api_edit = '{}ticket/{}/edit'.format(api, number)
-        data = {'user': self.config['user'], 'pass': self.config['pass'],
-                'content': 'Status: resolved'}
-        await self.http.post(api_edit, data=data, headers=headers)
-
+        await self.edit_ticket(number, 'resolved')
+        markdown_link = await self.get_markdown_link(number)
+        await evt.respond('{} resolved'.format(markdown_link))
