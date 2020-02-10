@@ -18,17 +18,19 @@ class Config(BaseProxyConfig):
 class RTLinksPlugin(Plugin):
     prefix: str
     whitelist: Set[UserID]
+    headers = {"User-agent": "rtlinksmaubot"}
     regex_properties = re.compile(r'([a-zA-z]+): (.+)')
     regex_number = re.compile(r'[0-9]{6}')
 
     async def start(self) -> None:
-        #await super().start()
         self.on_external_config_update()
 
     def on_external_config_update(self) -> None:
         self.config.load_and_update()
         self.prefix = self.config["prefix"]
         self.whitelist = set(self.config["whitelist"])
+        self.api = '{}/REST/1.0/'.format(self.config['url'])
+        self.post_data = {'user': self.config['user'], 'pass': self.config['pass']}
 
     @classmethod
     def get_config_class(cls) -> Type[BaseProxyConfig]:
@@ -45,12 +47,9 @@ class RTLinksPlugin(Plugin):
         return False
 
     async def show_ticket(self, number: str) -> dict:
-        headers = {"User-agent": "rtlinksmaubot"}
-        api = '{}/REST/1.0/'.format(self.config['url'])
-        data = {'user': self.config['user'], 'pass': self.config['pass']}
-        await self.http.post(api, data=data, headers=headers)
-        api_show = '{}ticket/{}/show'.format(api, number)
-        async with self.http.get(api_show, headers=headers) as response:
+        await self.http.post(self.api, data=self.post_data, headers=self.headers)
+        api_show = '{}ticket/{}/show'.format(self.api, number)
+        async with self.http.get(api_show, headers=self.headers) as response:
             content = await response.text()
         ticket = dict(self.regex_properties.findall(content))
         return ticket
@@ -61,25 +60,19 @@ class RTLinksPlugin(Plugin):
         return markdown
 
     async def edit_ticket(self, number: str, status: str) -> None:
-        headers = {"User-agent": "rtlinksmaubot"}
-        api = '{}/REST/1.0/'.format(self.config['url'])
-        api_edit = '{}ticket/{}/edit'.format(api, number)
-        data = {'user': self.config['user'], 'pass': self.config['pass'],
-                'content': 'Status: {}'.format(status)}
-        await self.http.post(api_edit, data=data, headers=headers)
+        api_edit = '{}ticket/{}/edit'.format(self.api, number)
+        data = {**self.post_data, **{'content': 'Status: {}'.format(status)}}
+        await self.http.post(api_edit, data=data, headers=self.headers)
 
     @command.passive("((^| )([rR][tT]#?))([0-9]{6})", multiple=True)
     async def handler(self, evt: MessageEvent, subs: List[Tuple[str, str]]) -> None:
         await evt.mark_read()
         msg_lines = []
-        headers = {"User-agent": "rtlinksmaubot"}
-        api = '{}/REST/1.0/'.format(self.config['url'])
-        data = {'user': self.config['user'], 'pass': self.config['pass']}
-        await self.http.post(api, data=data, headers=headers)
+        await self.http.post(self.api, data=self.post_data, headers=self.headers)
         for sub in subs:
             number = sub[4]
-            api_show = '{}ticket/{}/show'.format(api, number)
-            async with self.http.get(api_show, headers=headers) as response:
+            api_show = '{}ticket/{}/show'.format(self.api, number)
+            async with self.http.get(api_show, headers=self.headers) as response:
                 content = await response.text()
             ticket = dict(self.regex.findall(content))
             markdown_link = await self.get_markdown_link(number)
@@ -110,10 +103,7 @@ class RTLinksPlugin(Plugin):
         properties_dict = await self.show_ticket(number)
         properties_list = ["{}: {}".format(k, v) for k, v in properties_dict.items()]
         markdown_link = await self.get_markdown_link(number)
-        markdown = '{} properties:  \n{}'.format(
-            markdown_link,
-            '  \n'.join(properties_list)
-        )
+        markdown = '{} properties:  \n{}'.format(markdown_link, '  \n'.join(properties_list))
         await evt.respond(markdown)
 
     @rt.subcommand("resolve", help="Mark the ticket as resolved.")
