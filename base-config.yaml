@@ -1,0 +1,6 @@
+# RT base URL
+url: https://example.com/rt
+# RT Username
+user: rtlinks
+# RT Password
+pass: secret

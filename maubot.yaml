@@ -5,7 +5,7 @@ maubot: 0.1.0
 id: isg.rda.rtlinks
 
 # A PEP 440 compliant version string.
-version: 0.2.0
+version: 0.2.4
 
 # The SPDX license identifier for the plugin. https://spdx.org/licenses/
 # Optional, assumes all rights reserved if omitted.
@@ -28,8 +28,8 @@ main_class: RTLinksPlugin
 database: false
 
 #  Extra files that the upcoming build tool should include in the mbp file.
-#extra_files:
-#- base-config.yaml
+extra_files:
+- base-config.yaml
 #- LICENSE
 
 # List of dependencies
