@@ -65,7 +65,7 @@ class RTLinksPlugin(Plugin):
         api = '{}/REST/1.0/'.format(self.config['url'])
         api_edit = '{}ticket/{}/edit'.format(api, number)
         data = {'user': self.config['user'], 'pass': self.config['pass'],
-                'content': 'Status: resolved'}
+                'content': 'Status: {}'.format(status)}
         await self.http.post(api_edit, data=data, headers=headers)
 
     @command.passive("((^| )([rR][tT]#?))([0-9]{6})", multiple=True)
