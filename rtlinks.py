@@ -220,14 +220,15 @@ class RTLinksPlugin(Plugin):
         await evt.respond(markdown)
 
     @rt.subcommand("last", aliases=("l", "la"),
-                   help="Gets the history information for the last history entry.")
+                   help="Gets the last history entry with correspondence.")
     @command.argument("number", "ticket number", parser=str)
     async def last(self, evt: MessageEvent, number: str) -> None:
         if not await self.can_manage(evt) or not self.is_valid_number(number):
             return
         await evt.mark_read()
         history_dict = await self._history(number)
-        entry = max(history_dict, key=int)
+        correspondences = {k: v for k, v in history_dict.items() if 'Corr' in v or 'Tick' in v}
+        entry = max(correspondences, key=int)
         entry_dict = await self._entry(number, entry)
         entry_list = ["{}: {}".format(k, v) for k, v in entry_dict.items()]
         markdown_link = await self.get_markdown_link(number)
