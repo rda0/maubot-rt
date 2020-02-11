@@ -10,3 +10,19 @@ pass: secret
 # The list of user IDs who are allowed to use commands
 whitelist:
 - '@user:example.com'
+# List of ticket properties to show
+filter_properties:
+- 'Queue'
+- 'Owner'
+- 'Creator'
+- 'Subject'
+- 'Status'
+- 'Requestors'
+- 'Cc'
+- 'Created'
+- 'LastUpdated'
+# List of history entry properties to show
+filter_entry:
+- 'Description'
+- 'Content'
+- 'Created'

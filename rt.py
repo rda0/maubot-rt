@@ -13,6 +13,8 @@ class Config(BaseProxyConfig):
         helper.copy("user")
         helper.copy("pass")
         helper.copy("whitelist")
+        helper.copy("filter_properties")
+        helper.copy("filter_entry")
 
 
 class RT(Plugin):
@@ -35,6 +37,8 @@ class RT(Plugin):
         self.whitelist = set(self.config["whitelist"])
         self.api = '{}/REST/1.0/'.format(self.config['url'])
         self.post_data = {'user': self.config['user'], 'pass': self.config['pass']}
+        self.filter_properties = set(self.config["filter_properties"])
+        self.filter_entry = set(self.config["filter_entry"])
 
     @classmethod
     def get_config_class(cls) -> Type[BaseProxyConfig]:
@@ -50,6 +54,9 @@ class RT(Plugin):
             return True
         return False
 
+    def filter_dict(self, raw: dict, keys: Set) -> dict:
+        return {k: v for k, v in raw.items() if k in keys}
+
     async def get_markdown_link(self, number: str) -> str:
         link = "{}/Ticket/Display.html?id={}".format(self.config['url'], number)
         markdown = "[rt#{}]({})".format(number, link)
@@ -60,8 +67,8 @@ class RT(Plugin):
         api_show = '{}ticket/{}/show'.format(self.api, number)
         async with self.http.get(api_show, headers=self.headers) as response:
             content = await response.text()
-        ticket = dict(self.regex_properties.findall(content))
-        return ticket
+        raw = dict(self.regex_properties.findall(content))
+        return self.filter_dict(raw, self.filter_properties)
 
     async def _edit(self, number: str, status: str) -> None:
         api_edit = '{}ticket/{}/edit'.format(self.api, number)
@@ -88,11 +95,12 @@ class RT(Plugin):
         api_entry = '{}ticket/{}/history/id/{}'.format(self.api, number, entry)
         async with self.http.get(api_entry, headers=self.headers) as response:
             content = await response.text()
-        ticket = dict(self.regex_entry.findall(content))
-        if 'Content' in ticket and '\n' in ticket['Content']:
-            formatted_content = '\n\n' + (' ' * 8) + ticket['Content']
-            ticket['Content'] = formatted_content.rstrip()
-        return ticket
+        raw = dict(self.regex_entry.findall(content))
+        entry = self.filter_dict(raw, self.filter_entry)
+        if 'Content' in entry and '\n' in entry['Content']:
+            block = '  \n```\n' + entry['Content'].replace('\n         ', '\n').rstrip() + '\n```'
+            entry['Content'] = block
+        return entry
 
     @command.passive("((^| )([rR][tT]#?))([0-9]+)", multiple=True)
     async def handler(self, evt: MessageEvent, subs: List[Tuple[str, str]]) -> None:
@@ -241,14 +249,12 @@ class RT(Plugin):
         if not await self.can_manage(evt) or not self.is_valid_number(number):
             return
         await evt.mark_read()
-        properties_dict = await self._properties(number)
-        properties_list = ["{}: {}".format(k, v) for k, v in properties_dict.items()]
-        markdown_link = await self.get_markdown_link(number)
-        markdown = '{} properties:  \n{}  \n\n'.format(markdown_link, '  \n'.join(properties_list))
+        prop_dict = await self._properties(number)
+        prop_list = ["{}: {}".format(k, v) for k, v in prop_dict.items()]
+        link = await self.get_markdown_link(number)
+        await evt.respond('{} properties:  \n{}'.format(link, '  \n'.join(prop_list)))
         history_dict = await self._history(number)
         for entry in history_dict.keys():
             entry_dict = await self._entry(number, entry)
             entry_list = ["{}: {}".format(k, v) for k, v in entry_dict.items()]
-            markdown += '{} history entry {}:  \n{}  \n\n'.format(markdown_link, entry,
-                                                                  '  \n'.join(entry_list))
-        await evt.respond(markdown)
+            await evt.respond('history entry {}:  \n{}'.format(entry, '  \n'.join(entry_list)))
