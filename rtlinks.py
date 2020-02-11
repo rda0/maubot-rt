@@ -22,6 +22,7 @@ class RTLinksPlugin(Plugin):
     regex_number = re.compile(r'[0-9]{6}')
     regex_properties = re.compile(r'([a-zA-z]+): (.+)')
     regex_history = re.compile(r'([0-9]+): (.+)')
+    regex_entry = re.compile(r'([a-zA-z]+): (.+(?:\n {8}.*)*)', re.MULTILINE)
 
     async def start(self) -> None:
         self.on_external_config_update()
@@ -85,7 +86,10 @@ class RTLinksPlugin(Plugin):
         api_entry = '{}ticket/{}/history/id/{}'.format(self.api, number, entry)
         async with self.http.get(api_entry, headers=self.headers) as response:
             content = await response.text()
-        ticket = dict(self.regex_properties.findall(content))
+        ticket = dict(self.regex_entry.findall(content))
+        if 'Content' in ticket and '\n' in ticket['Content']:
+            formatted_content = '\n\n' + (' ' * 8) + ticket['Content']
+            ticket['Content'] = formatted_content.rstrip()
         return ticket
 
     @command.passive("((^| )([rR][tT]#?))([0-9]{6})", multiple=True)
@@ -139,7 +143,7 @@ class RTLinksPlugin(Plugin):
         markdown_link = await self.get_markdown_link(number)
         await evt.respond('{} resolved'.format(markdown_link))
 
-    @rt.subcommand("open", aliases=("o", "op"),help="Mark the ticket as open.")
+    @rt.subcommand("open", aliases=("o", "op"), help="Mark the ticket as open.")
     @command.argument("number", "ticket number", pass_raw=True)
     async def open(self, evt: MessageEvent, number: str) -> None:
         if not await self.can_manage(evt) or not self.is_valid_number(number):
@@ -174,7 +178,7 @@ class RTLinksPlugin(Plugin):
         if not await self.can_manage(evt):
             return
         await evt.mark_read()
-        await evt.reply('😂 lol, this is your job!')
+        await evt.react('😂🤣🦄🌈')
 
     @rt.subcommand("comment", aliases=("c", "com"), help="Add a comment.")
     @command.argument("number", "ticket number", parser=str)
