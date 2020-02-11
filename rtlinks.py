@@ -104,12 +104,12 @@ class RTLinksPlugin(Plugin):
                 content = await response.text()
             ticket = dict(self.regex_properties.findall(content))
             markdown_link = await self.get_markdown_link(number)
-            markdown = "{} ({}) is **{}** in **{}** from {}".format(
+            markdown = "{} is **{}** in **{}** from {}  \n{}".format(
                 markdown_link,
-                ticket['Subject'],
                 ticket['Status'],
                 ticket['Queue'],
-                ticket['Creator']
+                ticket['Creator'],
+                ticket['Subject']
             )
             msg_lines.append(markdown)
 
@@ -191,8 +191,7 @@ class RTLinksPlugin(Plugin):
         markdown_link = await self.get_markdown_link(number)
         await evt.respond('{} comment added'.format(markdown_link))
 
-    @rt.subcommand("history", aliases=("h", "hist"),
-                   help="Get a list of all history items for a given ticket.")
+    @rt.subcommand("history", aliases=("h", "hist"), help="Get a list of all history entries.")
     @command.argument("number", "ticket number", pass_raw=True)
     async def history(self, evt: MessageEvent, number: str) -> None:
         if not await self.can_manage(evt) or not self.is_valid_number(number):
@@ -204,8 +203,7 @@ class RTLinksPlugin(Plugin):
         markdown = '{} history entries:  \n{}'.format(markdown_link, '  \n'.join(history_list))
         await evt.respond(markdown)
 
-    @rt.subcommand("entry", aliases=("e", "ent"),
-                   help="Gets the history information for a single history entry.")
+    @rt.subcommand("entry", aliases=("e", "ent"), help="Gets a single history entry.")
     @command.argument("number", "ticket number", parser=str)
     @command.argument("entry", "history entry number", parser=str)
     async def entry(self, evt: MessageEvent, number: str, entry: str) -> None:
@@ -219,8 +217,7 @@ class RTLinksPlugin(Plugin):
                                                        '  \n'.join(entry_list))
         await evt.respond(markdown)
 
-    @rt.subcommand("last", aliases=("l", "la"),
-                   help="Gets the last history entry with correspondence.")
+    @rt.subcommand("last", aliases=("l", "la"), help="Gets the last correspondence entry.")
     @command.argument("number", "ticket number", parser=str)
     async def last(self, evt: MessageEvent, number: str) -> None:
         if not await self.can_manage(evt) or not self.is_valid_number(number):
