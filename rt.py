@@ -151,7 +151,7 @@ class RT(Plugin):
         await evt.mark_read()
         await self._edit(number, 'resolved')
         markdown_link = await self.get_markdown_link(number)
-        await evt.respond('{} resolved'.format(markdown_link))
+        await evt.respond('{} resolved 😃'.format(markdown_link))
 
     @rt.subcommand("open", aliases=("o", "op"), help="Mark the ticket as open.")
     @command.argument("number", "ticket number", parser=str)
@@ -161,7 +161,7 @@ class RT(Plugin):
         await evt.mark_read()
         await self._edit(number, 'open')
         markdown_link = await self.get_markdown_link(number)
-        await evt.respond('{} opened'.format(markdown_link))
+        await evt.respond('{} opened 😐️'.format(markdown_link))
 
     @rt.subcommand("stall", aliases=("st", "sta"), help="Mark the ticket as stalled.")
     @command.argument("number", "ticket number", parser=str)
@@ -171,7 +171,7 @@ class RT(Plugin):
         await evt.mark_read()
         await self._edit(number, 'stalled')
         markdown_link = await self.get_markdown_link(number)
-        await evt.respond('{} stalled'.format(markdown_link))
+        await evt.respond('{} stalled 😴'.format(markdown_link))
 
     @rt.subcommand("delete", aliases=("d", "del"), help="Mark the ticket as deleted.")
     @command.argument("number", "ticket number", parser=str)
@@ -181,7 +181,7 @@ class RT(Plugin):
         await evt.mark_read()
         await self._edit(number, 'deleted')
         markdown_link = await self.get_markdown_link(number)
-        await evt.respond('{} deleted'.format(markdown_link))
+        await evt.respond('{} deleted 🤬'.format(markdown_link))
 
     @rt.subcommand("autoresolve", help="Enable automatic ticket resolve mode.")
     async def autoresolve(self, evt: MessageEvent) -> None:
@@ -199,7 +199,7 @@ class RT(Plugin):
         await evt.mark_read()
         await self._comment(number, comment)
         markdown_link = await self.get_markdown_link(number)
-        await evt.respond('{} comment added'.format(markdown_link))
+        await evt.respond('{} comment added 🤓'.format(markdown_link))
 
     @rt.subcommand("history", aliases=("h", "hist"), help="Get a list of all history entries.")
     @command.argument("number", "ticket number", parser=str)
