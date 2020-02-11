@@ -4,9 +4,9 @@ prefix: 'rt'
 # RT base URL
 url: https://example.com/rt
 # RT Username
-user: rtlinks
+user: maubot
 # RT Password
 pass: secret
-# The list of user IDs who are allowed to modify stuff.
+# The list of user IDs who are allowed to use commands
 whitelist:
 - '@user:example.com'

@@ -15,10 +15,10 @@ class Config(BaseProxyConfig):
         helper.copy("whitelist")
 
 
-class RTLinksPlugin(Plugin):
+class RT(Plugin):
     prefix: str
     whitelist: Set[UserID]
-    headers = {"User-agent": "rtlinksmaubot"}
+    headers = {"User-agent": "maubot-rt"}
     regex_number = re.compile(r'[0-9]{6}')
     regex_properties = re.compile(r'([a-zA-z]+): (.+)')
     regex_history = re.compile(r'([0-9]+): (.+)')
