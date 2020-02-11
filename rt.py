@@ -124,7 +124,7 @@ class RT(Plugin):
         pass
 
     @rt.subcommand("properties", aliases=("p", "prop"), help="Show all ticket properties.")
-    @command.argument("number", "ticket number", pass_raw=True)
+    @command.argument("number", "ticket number", parser=str)
     async def properties(self, evt: MessageEvent, number: str) -> None:
         if not await self.can_manage(evt) or not self.is_valid_number(number):
             return
@@ -136,7 +136,7 @@ class RT(Plugin):
         await evt.respond(markdown)
 
     @rt.subcommand("resolve", aliases=("r", "res"), help="Mark the ticket as resolved.")
-    @command.argument("number", "ticket number", pass_raw=True)
+    @command.argument("number", "ticket number", parser=str)
     async def resolve(self, evt: MessageEvent, number: str) -> None:
         if not await self.can_manage(evt) or not self.is_valid_number(number):
             return
@@ -146,7 +146,7 @@ class RT(Plugin):
         await evt.respond('{} resolved'.format(markdown_link))
 
     @rt.subcommand("open", aliases=("o", "op"), help="Mark the ticket as open.")
-    @command.argument("number", "ticket number", pass_raw=True)
+    @command.argument("number", "ticket number", parser=str)
     async def open(self, evt: MessageEvent, number: str) -> None:
         if not await self.can_manage(evt) or not self.is_valid_number(number):
             return
@@ -156,7 +156,7 @@ class RT(Plugin):
         await evt.respond('{} opened'.format(markdown_link))
 
     @rt.subcommand("stall", aliases=("st", "sta"), help="Mark the ticket as stalled.")
-    @command.argument("number", "ticket number", pass_raw=True)
+    @command.argument("number", "ticket number", parser=str)
     async def stall(self, evt: MessageEvent, number: str) -> None:
         if not await self.can_manage(evt) or not self.is_valid_number(number):
             return
@@ -166,7 +166,7 @@ class RT(Plugin):
         await evt.respond('{} stalled'.format(markdown_link))
 
     @rt.subcommand("delete", aliases=("d", "del"), help="Mark the ticket as deleted.")
-    @command.argument("number", "ticket number", pass_raw=True)
+    @command.argument("number", "ticket number", parser=str)
     async def delete(self, evt: MessageEvent, number: str) -> None:
         if not await self.can_manage(evt) or not self.is_valid_number(number):
             return
@@ -194,7 +194,7 @@ class RT(Plugin):
         await evt.respond('{} comment added'.format(markdown_link))
 
     @rt.subcommand("history", aliases=("h", "hist"), help="Get a list of all history entries.")
-    @command.argument("number", "ticket number", pass_raw=True)
+    @command.argument("number", "ticket number", parser=str)
     async def history(self, evt: MessageEvent, number: str) -> None:
         if not await self.can_manage(evt) or not self.is_valid_number(number):
             return
