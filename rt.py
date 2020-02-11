@@ -18,8 +18,10 @@ class Config(BaseProxyConfig):
 class RT(Plugin):
     prefix: str
     whitelist: Set[UserID]
+    api: str
+    post_data: dict
     headers = {"User-agent": "maubot-rt"}
-    regex_number = re.compile(r'[0-9]{6}')
+    regex_number = re.compile(r'[0-9]+')
     regex_properties = re.compile(r'([a-zA-z]+): (.+)')
     regex_history = re.compile(r'([0-9]+): (.+)')
     regex_entry = re.compile(r'([a-zA-z]+): (.+(?:\n {8}.*)*)', re.MULTILINE)
@@ -92,7 +94,7 @@ class RT(Plugin):
             ticket['Content'] = formatted_content.rstrip()
         return ticket
 
-    @command.passive("((^| )([rR][tT]#?))([0-9]{6})", multiple=True)
+    @command.passive("((^| )([rR][tT]#?))([0-9]+)", multiple=True)
     async def handler(self, evt: MessageEvent, subs: List[Tuple[str, str]]) -> None:
         await evt.mark_read()
         msg_lines = []
