@@ -1,6 +1,6 @@
 import re
-from typing import List, Tuple, Type, Set
-from mautrix.types import UserID
+from typing import List, Tuple, Type, Set, Dict
+from mautrix.types import (UserID, RoomID, EventType, TextMessageEventContent, MessageType, Format)
 from mautrix.util.config import BaseProxyConfig, ConfigUpdateHelper
 from maubot import Plugin, MessageEvent
 from maubot.handlers import command
@@ -21,7 +21,7 @@ class RT(Plugin):
     prefix: str
     whitelist: Set[UserID]
     api: str
-    post_data: dict
+    login: dict
     headers = {"User-agent": "maubot-rt"}
     regex_number = re.compile(r'[0-9]+')
     regex_properties = re.compile(r'([a-zA-z]+): (.+)')
@@ -35,8 +35,10 @@ class RT(Plugin):
         self.config.load_and_update()
         self.prefix = self.config["prefix"]
         self.whitelist = set(self.config["whitelist"])
-        self.api = '{}/REST/1.0/'.format(self.config['url'])
-        self.post_data = {'user': self.config['user'], 'pass': self.config['pass']}
+        self.url = self.config['url']
+        self.api = '{}/REST/1.0/'.format(self.url)
+        self.display = '{}/Ticket/Display.html'.format(self.url)
+        self.login = {'user': self.config['user'], 'pass': self.config['pass']}
         self.filter_properties = set(self.config["filter_properties"])
         self.filter_entry = set(self.config["filter_entry"])
 
@@ -48,6 +50,17 @@ class RT(Plugin):
         if evt.sender in self.whitelist:
             return True
         return False
+
+    async def get_username(self, evt: MessageEvent) -> str:
+        return evt.sender[1:].split(':')[0]
+
+    async def get_member_names(self, room_id: RoomID) -> Dict[UserID, str]:
+        room_members = await self.client.get_joined_members(room_id)
+        member_names = {}
+        for mxid in room_members.keys():
+            displayname = await self._get_displayname(room_id, mxid)
+            member_names[displayname] = mxid
+        return member_names
 
     def is_valid_number(self, number: str) -> bool:
         if self.regex_number.match(number):
@@ -62,28 +75,37 @@ class RT(Plugin):
         markdown = "[rt#{}]({})".format(number, link)
         return markdown
 
+    async def get_html_link(self, number: str) -> str:
+        link = "{}/Ticket/Display.html?id={}".format(self.config['url'], number)
+        html = '<a href="{}">rt#{}</a>'.format(link, number)
+        return html
+
+    async def _get_displayname(self, room_id: RoomID, user_id: UserID) -> str:
+        event = await self.client.get_state_event(room_id, EventType.ROOM_MEMBER, user_id)
+        return event.displayname
+
     async def _properties(self, number: str) -> dict:
-        await self.http.post(self.api, data=self.post_data, headers=self.headers)
+        await self.http.post(self.api, data=self.login, headers=self.headers)
         api_show = '{}ticket/{}/show'.format(self.api, number)
         async with self.http.get(api_show, headers=self.headers) as response:
             content = await response.text()
         raw = dict(self.regex_properties.findall(content))
         return self.filter_dict(raw, self.filter_properties)
 
-    async def _edit(self, number: str, status: str) -> None:
+    async def _edit(self, number: str, properties: dict) -> None:
         api_edit = '{}ticket/{}/edit'.format(self.api, number)
-        content = {'content': 'Status: {}'.format(status)}
-        data = {**self.post_data, **content}
+        content = {'content': '\n'.join(["{}: {}".format(k, v) for k, v in properties.items()])}
+        data = {**self.login, **content}
         await self.http.post(api_edit, data=data, headers=self.headers)
 
     async def _comment(self, number: str, comment: str) -> None:
         api_comment = '{}ticket/{}/comment'.format(self.api, number)
         content = {'content': 'id: {}\nAction: comment\nText: {}'.format(number, comment)}
-        data = {**self.post_data, **content}
+        data = {**self.login, **content}
         await self.http.post(api_comment, data=data, headers=self.headers)
 
     async def _history(self, number: str) -> dict:
-        await self.http.post(self.api, data=self.post_data, headers=self.headers)
+        await self.http.post(self.api, data=self.login, headers=self.headers)
         api_history = '{}ticket/{}/history'.format(self.api, number)
         async with self.http.get(api_history, headers=self.headers) as response:
             content = await response.text()
@@ -91,7 +113,7 @@ class RT(Plugin):
         return ticket
 
     async def _entry(self, number: str, entry: str) -> dict:
-        await self.http.post(self.api, data=self.post_data, headers=self.headers)
+        await self.http.post(self.api, data=self.login, headers=self.headers)
         api_entry = '{}ticket/{}/history/id/{}'.format(self.api, number, entry)
         async with self.http.get(api_entry, headers=self.headers) as response:
             content = await response.text()
@@ -106,7 +128,7 @@ class RT(Plugin):
     async def handler(self, evt: MessageEvent, subs: List[Tuple[str, str]]) -> None:
         await evt.mark_read()
         msg_lines = []
-        await self.http.post(self.api, data=self.post_data, headers=self.headers)
+        await self.http.post(self.api, data=self.login, headers=self.headers)
         for sub in subs:
             number = sub[4]
             api_show = '{}ticket/{}/show'.format(self.api, number)
@@ -149,7 +171,7 @@ class RT(Plugin):
         if not await self.can_manage(evt) or not self.is_valid_number(number):
             return
         await evt.mark_read()
-        await self._edit(number, 'resolved')
+        await self._edit(number, {'Status': 'resolved'})
         markdown_link = await self.get_markdown_link(number)
         await evt.respond('{} resolved 😃'.format(markdown_link))
 
@@ -159,7 +181,7 @@ class RT(Plugin):
         if not await self.can_manage(evt) or not self.is_valid_number(number):
             return
         await evt.mark_read()
-        await self._edit(number, 'open')
+        await self._edit(number, {'Status': 'open'})
         markdown_link = await self.get_markdown_link(number)
         await evt.respond('{} opened 😐️'.format(markdown_link))
 
@@ -169,7 +191,7 @@ class RT(Plugin):
         if not await self.can_manage(evt) or not self.is_valid_number(number):
             return
         await evt.mark_read()
-        await self._edit(number, 'stalled')
+        await self._edit(number, {'Status': 'stalled'})
         markdown_link = await self.get_markdown_link(number)
         await evt.respond('{} stalled 😴'.format(markdown_link))
 
@@ -179,7 +201,7 @@ class RT(Plugin):
         if not await self.can_manage(evt) or not self.is_valid_number(number):
             return
         await evt.mark_read()
-        await self._edit(number, 'deleted')
+        await self._edit(number, {'Status': 'deleted'})
         markdown_link = await self.get_markdown_link(number)
         await evt.respond('{} deleted 🤬'.format(markdown_link))
 
@@ -258,3 +280,60 @@ class RT(Plugin):
             entry_dict = await self._entry(number, entry)
             entry_list = ["{}: {}".format(k, v) for k, v in entry_dict.items()]
             await evt.respond('history entry {}:  \n{}'.format(entry, '  \n'.join(entry_list)))
+
+    @rt.subcommand("steal", aliases=("st", "ste"), help="Steal the ticket.")
+    @command.argument("number", "ticket number", parser=str)
+    async def steal(self, evt: MessageEvent, number: str) -> None:
+        if not await self.can_manage(evt) or not self.is_valid_number(number):
+            return
+        await evt.mark_read()
+        username = await self.get_username(evt)
+        displayname = await self._get_displayname(evt.room_id, evt.sender)
+        await self._edit(number, {'Owner': username})
+        html_link = await self.get_html_link(number)
+        content = TextMessageEventContent(
+            msgtype=MessageType.NOTICE, format=Format.HTML,
+            body=f"{displayname} has stolen rt#{number} 😈",
+            formatted_body=f"<a href='https://matrix.to/#/{evt.sender}'>{evt.sender}</a> "
+            f"has stolen {html_link} 😈")
+        await evt.respond(content)
+
+    @rt.subcommand("take", aliases=("t", "ta"), help="Take the ticket.")
+    @command.argument("number", "ticket number", parser=str)
+    async def take(self, evt: MessageEvent, number: str) -> None:
+        if not await self.can_manage(evt) or not self.is_valid_number(number):
+            return
+        await evt.mark_read()
+        username = await self.get_username(evt)
+        displayname = await self._get_displayname(evt.room_id, evt.sender)
+        await self._edit(number, {'Owner': username})
+        html_link = await self.get_html_link(number)
+        content = TextMessageEventContent(
+            msgtype=MessageType.NOTICE, format=Format.HTML,
+            body=f"{displayname} took rt#{number} 👍️",
+            formatted_body=f"<a href='https://matrix.to/#/{evt.sender}'>{evt.sender}</a> "
+            f"took {html_link} 👍️")
+        await evt.respond(content)
+
+    @rt.subcommand("give", aliases=("g", "gi", "assign"), help="Give the ticket to somebody.")
+    @command.argument("number", "ticket number", parser=str)
+    @command.argument("user", "matrix user", parser=str)
+    async def give(self, evt: MessageEvent, number: str, user: str) -> None:
+        if not await self.can_manage(evt) or not self.is_valid_number(number):
+            return
+        await evt.mark_read()
+        members = await self.get_member_names(evt.room_id)
+        if user not in members.keys():
+            await evt.respond(f"hmm... **{user}** is not the in room 🤔")
+            return
+        displayname = await self._get_displayname(evt.room_id, evt.sender)
+        target_mxid = members[user]
+        target_username = target_mxid[1:].split(':')[0]
+        await self._edit(number, {'Owner': target_username})
+        html_link = await self.get_html_link(number)
+        content = TextMessageEventContent(
+            msgtype=MessageType.NOTICE, format=Format.HTML,
+            body=f"{displayname} assigned rt#{number} to {user} 😜",
+            formatted_body=f"<a href='https://matrix.to/#/{evt.sender}'>{evt.sender}</a> assigned "
+            f"{html_link} to <a href='https://matrix.to/#/{target_mxid}'>{target_mxid}</a> 😜")
+        await evt.respond(content)
