@@ -47,7 +47,7 @@ class RT(Plugin):
     def get_config_class(cls) -> Type[BaseProxyConfig]:
         return Config
 
-    def valid_id(self, id: str) -> bool:
+    def is_valid_id(self, id: str) -> bool:
         return True if self.regex_id.match(id) else False
 
     def filter_dict(self, raw: dict, keys: Set) -> dict:
@@ -59,10 +59,13 @@ class RT(Plugin):
     def html_link(self, id: str) -> str:
         return f'<a href="{self.display}?id={id}">rt#{id}</a>'
 
-    def can_manage(self, evt: MessageEvent) -> bool:
+    async def can_manage(self, evt: MessageEvent) -> bool:
         if evt.sender in self.whitelist:
             return True
         return False
+
+    async def _username(self, evt: MessageEvent) -> str:
+        return evt.sender[1:].split(':')[0]
 
     async def _member_mxids(self, room_id: RoomID) -> Dict[UserID, str]:
         room_members = await self.client.get_joined_members(room_id)
@@ -146,7 +149,7 @@ class RT(Plugin):
     @rt.subcommand('properties', aliases=('p', 'prop'), help='Show all ticket properties.')
     @command.argument('id', 'ticket id', parser=str)
     async def properties(self, evt: MessageEvent, id: str) -> None:
-        if not self.can_manage(evt) or not self.valid_id(id):
+        if not await self.can_manage(evt) or not self.is_valid_id(id):
             return
         await evt.mark_read()
         properties_dict = await self._properties(id)
@@ -156,7 +159,7 @@ class RT(Plugin):
     @rt.subcommand('resolve', aliases=('r', 'res'), help='Mark the ticket as resolved.')
     @command.argument('id', 'ticket id', parser=str)
     async def resolve(self, evt: MessageEvent, id: str) -> None:
-        if not self.can_manage(evt) or not self.valid_id(id):
+        if not await self.can_manage(evt) or not self.is_valid_id(id):
             return
         await evt.mark_read()
         await self._edit(id, {'Status': 'resolved'})
@@ -165,7 +168,7 @@ class RT(Plugin):
     @rt.subcommand('open', aliases=('o', 'op'), help='Mark the ticket as open.')
     @command.argument('id', 'ticket id', parser=str)
     async def open(self, evt: MessageEvent, id: str) -> None:
-        if not self.can_manage(evt) or not self.valid_id(id):
+        if not await self.can_manage(evt) or not self.is_valid_id(id):
             return
         await evt.mark_read()
         await self._edit(id, {'Status': 'open'})
@@ -174,7 +177,7 @@ class RT(Plugin):
     @rt.subcommand('stall', aliases=('st', 'sta'), help='Mark the ticket as stalled.')
     @command.argument('id', 'ticket id', parser=str)
     async def stall(self, evt: MessageEvent, id: str) -> None:
-        if not self.can_manage(evt) or not self.valid_id(id):
+        if not await self.can_manage(evt) or not self.is_valid_id(id):
             return
         await evt.mark_read()
         await self._edit(id, {'Status': 'stalled'})
@@ -183,7 +186,7 @@ class RT(Plugin):
     @rt.subcommand('delete', aliases=('d', 'del'), help='Mark the ticket as deleted.')
     @command.argument('id', 'ticket id', parser=str)
     async def delete(self, evt: MessageEvent, id: str) -> None:
-        if not self.can_manage(evt) or not self.valid_id(id):
+        if not await self.can_manage(evt) or not self.is_valid_id(id):
             return
         await evt.mark_read()
         await self._edit(id, {'Status': 'deleted'})
@@ -191,7 +194,7 @@ class RT(Plugin):
 
     @rt.subcommand('autoresolve', help='Ask the bot to automatically answer and resolve tickets.')
     async def autoresolve(self, evt: MessageEvent) -> None:
-        if not self.can_manage(evt):
+        if not await self.can_manage(evt):
             return
         await evt.mark_read()
         await evt.react('😂🤣🦄🌈')
@@ -200,7 +203,7 @@ class RT(Plugin):
     @command.argument('id', 'ticket id', parser=str)
     @command.argument('comment', 'comment text', pass_raw=True)
     async def comment(self, evt: MessageEvent, id: str, comment: str) -> None:
-        if not self.can_manage(evt) or not self.valid_id(id):
+        if not await self.can_manage(evt) or not self.is_valid_id(id):
             return
         await evt.mark_read()
         await self._comment(id, comment)
@@ -209,7 +212,7 @@ class RT(Plugin):
     @rt.subcommand('history', aliases=('h', 'hist'), help='Get a list of all history entries.')
     @command.argument('id', 'ticket id', parser=str)
     async def history(self, evt: MessageEvent, id: str) -> None:
-        if not self.can_manage(evt) or not self.valid_id(id):
+        if not await self.can_manage(evt) or not self.is_valid_id(id):
             return
         await evt.mark_read()
         history_dict = await self._history(id)
@@ -220,7 +223,7 @@ class RT(Plugin):
     @command.argument('id', 'ticket id', parser=str)
     @command.argument('entryid', 'history entry id', parser=str)
     async def entry(self, evt: MessageEvent, id: str, entryid: str) -> None:
-        if not self.can_manage(evt) or not self.valid_id(id):
+        if not await self.can_manage(evt) or not self.is_valid_id(id):
             return
         await evt.mark_read()
         entry_dict = await self._entry(id, entryid)
@@ -230,7 +233,7 @@ class RT(Plugin):
     @rt.subcommand('last', aliases=('l', 'la'), help='Gets the last entry.')
     @command.argument('id', 'ticket id', parser=str)
     async def last(self, evt: MessageEvent, id: str) -> None:
-        if not self.can_manage(evt) or not self.valid_id(id):
+        if not await self.can_manage(evt) or not self.is_valid_id(id):
             return
         await evt.mark_read()
         history = await self._history(id)
@@ -243,7 +246,7 @@ class RT(Plugin):
     @rt.subcommand('show', aliases=('s', 'sh'), help='Show all information about the ticket.')
     @command.argument('id', 'ticket id', parser=str)
     async def show(self, evt: MessageEvent, id: str) -> None:
-        if not self.can_manage(evt) or not self.valid_id(id):
+        if not await self.can_manage(evt) or not self.is_valid_id(id):
             return
         await evt.mark_read()
         prop_dict = await self._properties(id)
@@ -262,11 +265,12 @@ class RT(Plugin):
     @rt.subcommand('take', aliases=('t', 'ta', 'steal'), help='Take or steal the ticket.')
     @command.argument('id', 'ticket id', parser=str)
     async def take(self, evt: MessageEvent, id: str) -> None:
-        if not self.can_manage(evt) or not self.valid_id(id):
+        if not await self.can_manage(evt) or not self.is_valid_id(id):
             return
         await evt.mark_read()
+        username = await self._username(evt)
         displayname = await self._displayname(evt.room_id, evt.sender)
-        await self._edit(id, {'Owner': evt.sender[1:].split(':')[0]})
+        await self._edit(id, {'Owner': username})
         content = TextMessageEventContent(
             msgtype=MessageType.NOTICE, format=Format.HTML,
             body=f'{displayname} took rt#{id} 👍️',
@@ -278,7 +282,7 @@ class RT(Plugin):
     @command.argument('id', 'ticket id', parser=str)
     @command.argument('user', 'matrix user', parser=str)
     async def give(self, evt: MessageEvent, id: str, user: str) -> None:
-        if not self.can_manage(evt) or not self.valid_id(id):
+        if not await self.can_manage(evt) or not self.is_valid_id(id):
             return
         await evt.mark_read()
         member_mxids = await self._member_mxids(evt.room_id)
