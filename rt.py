@@ -191,6 +191,16 @@ class RT(Plugin):
         await self._edit(number, {'Status': 'deleted'})
         await evt.respond(f'{self.markdown_link(number)} deleted 🤬')
 
+    @rt.subcommand('queue', aliases=('q', 'que'), help='Put the ticket in queue.')
+    @command.argument('number', 'ticket number', parser=str)
+    @command.argument('queue', 'queue', parser=str)
+    async def queue(self, evt: MessageEvent, number: str, queue: str) -> None:
+        if not self.can_manage(evt) or not self.valid_number(number):
+            return
+        await evt.mark_read()
+        await self._edit(number, {'Status': 'open', 'Queue': queue})
+        await evt.respond(f'{self.markdown_link(number)} queued in **{queue}** 😐️')
+
     @rt.subcommand('autoresolve', help='Ask the bot to automatically answer and resolve tickets.')
     async def autoresolve(self, evt: MessageEvent) -> None:
         if not self.can_manage(evt):
