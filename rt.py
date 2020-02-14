@@ -1,6 +1,7 @@
 import re
 from typing import List, Tuple, Type, Set, Dict
-from mautrix.types import (UserID, RoomID, EventType, TextMessageEventContent, MessageType, Format)
+from mautrix.types import (UserID, RoomID, EventType, TextMessageEventContent, MessageType, Format,
+                           ReactionEvent)
 from mautrix.util.config import BaseProxyConfig, ConfigUpdateHelper
 from maubot import Plugin, MessageEvent
 from maubot.handlers import command
@@ -23,10 +24,12 @@ class RT(Plugin):
     api: str
     login: dict
     headers = {'User-agent': 'maubot-rt'}
+    regex_ticket = re.compile(r'(?:(?:[rR][tT]#?))([0-9]+)')
     regex_number = re.compile(r'[0-9]+')
     regex_properties = re.compile(r'([a-zA-z]+): (.+)')
     regex_history = re.compile(r'([0-9]+): (.+)')
     regex_entry = re.compile(r'([a-zA-z]+): (.+(?:\n {8}.*)*)', re.MULTILINE)
+    take_this = f'(\U0001F44D this to take the ticket)'
     interesting = [
         'Ticket created',
         'Correspondence added',
@@ -142,9 +145,26 @@ class RT(Plugin):
                 ticket['Subject']
             )
             msg_lines.append(markdown)
-
         if msg_lines:
-            await evt.respond('  \n'.join(msg_lines))
+            await evt.respond('  \n'.join(msg_lines + [self.take_this]))
+
+    @command.passive(regex=r"(?:\U0001F44D[\U0001F3FB-\U0001F3FF]?)",
+                     field=lambda evt: evt.content.relates_to.key,
+                     event_type=EventType.REACTION, msgtypes=None)
+    async def react_took(self, evt: ReactionEvent, _: Tuple[str]) -> None:
+        username = evt.sender[1:].split(':')[0]
+        displayname = await self._displayname(evt.room_id, evt.sender)
+        target_evt = await self.client.get_event(evt.room_id, evt.content.relates_to.event_id)
+        target_ticket = self.regex_ticket.findall(target_evt.content.body)
+        if len(target_ticket) == 1:
+            number = target_ticket[0]
+            await self._edit(number, {'Owner': username})
+            content = TextMessageEventContent(
+                msgtype=MessageType.NOTICE, format=Format.HTML,
+                body=f'{displayname} took {number}',
+                formatted_body=f'<a href="https://matrix.to/#/{evt.sender}">{evt.sender}</a> '
+                f'took <code>{target_ticket[0]}</code>')
+            await self.client.send_message(evt.room_id, content)
 
     @command.new(name=lambda self: self.prefix,
                  help='Manage RT tickets', require_subcommand=True)
@@ -159,7 +179,8 @@ class RT(Plugin):
         await evt.mark_read()
         properties_dict = await self._properties(number)
         properties = '  \n'.join([f'{k}: {v}' for k, v in properties_dict.items()])
-        await evt.respond(f'{self.markdown_link(number)} properties:  \n{properties}')
+        await evt.respond(f'{self.markdown_link(number)} properties:  \n{properties}'
+                          f'  \n{self.take_this}')
 
     @rt.subcommand('resolve', aliases=('r', 'res'), help='Mark the ticket as resolved.')
     @command.argument('number', 'ticket number', parser=str)
@@ -168,7 +189,7 @@ class RT(Plugin):
             return
         await evt.mark_read()
         await self._edit(number, {'Status': 'resolved'})
-        await evt.respond(f'{self.markdown_link(number)} resolved 😃')
+        await evt.respond(f'{self.markdown_link(number)} resolved 😃 {self.take_this}')
 
     @rt.subcommand('open', aliases=('o', 'op'), help='Mark the ticket as open.')
     @command.argument('number', 'ticket number', parser=str)
@@ -177,7 +198,7 @@ class RT(Plugin):
             return
         await evt.mark_read()
         await self._edit(number, {'Status': 'open'})
-        await evt.respond(f'{self.markdown_link(number)} opened 😐️')
+        await evt.respond(f'{self.markdown_link(number)} opened 😐️ {self.take_this}')
 
     @rt.subcommand('stall', aliases=('st', 'sta'), help='Mark the ticket as stalled.')
     @command.argument('number', 'ticket number', parser=str)
@@ -186,7 +207,7 @@ class RT(Plugin):
             return
         await evt.mark_read()
         await self._edit(number, {'Status': 'stalled'})
-        await evt.respond(f'{self.markdown_link(number)} stalled 😴')
+        await evt.respond(f'{self.markdown_link(number)} stalled 😴 {self.take_this}')
 
     @rt.subcommand('delete', aliases=('d', 'del'), help='Mark the ticket as deleted.')
     @command.argument('number', 'ticket number', parser=str)
@@ -195,7 +216,7 @@ class RT(Plugin):
             return
         await evt.mark_read()
         await self._edit(number, {'Status': 'deleted'})
-        await evt.respond(f'{self.markdown_link(number)} deleted 🤬')
+        await evt.respond(f'{self.markdown_link(number)} deleted 🤬 {self.take_this}')
 
     @rt.subcommand('queue', aliases=('q', 'que'), help='Put the ticket in queue.')
     @command.argument('number', 'ticket number', parser=str)
@@ -205,7 +226,7 @@ class RT(Plugin):
             return
         await evt.mark_read()
         await self._edit(number, {'Status': 'open', 'Queue': queue})
-        await evt.respond(f'{self.markdown_link(number)} queued in **{queue}** 😐️')
+        await evt.respond(f'{self.markdown_link(number)} queued in **{queue}** 😐️ {self.take_this}')
 
     @rt.subcommand('comment', aliases=('c', 'com'), help='Add a comment.')
     @command.argument('number', 'ticket number', parser=str)
@@ -215,7 +236,7 @@ class RT(Plugin):
             return
         await evt.mark_read()
         await self._comment(number, comment)
-        await evt.respond(f'{self.markdown_link(number)} comment added 🤓')
+        await evt.respond(f'{self.markdown_link(number)} comment added 🤓 {self.take_this}')
 
     @rt.subcommand('history', aliases=('h', 'hist'), help='Get a list of all history entries.')
     @command.argument('number', 'ticket number', parser=str)
@@ -236,7 +257,8 @@ class RT(Plugin):
         await evt.mark_read()
         entry_dict = await self._entry(number, entryid)
         entry = '  \n'.join([f'{k}: {v}' for k, v in entry_dict.items()])
-        await evt.respond(f'{self.markdown_link(number)} history entry {entryid}:  \n{entry}')
+        await evt.respond(f'{self.markdown_link(number)} history entry {entryid}:  \n{entry}'
+                          f'  \n{self.take_this}')
 
     @rt.subcommand('last', aliases=('l', 'la'), help='Gets the last entry.')
     @command.argument('number', 'ticket number', parser=str)
@@ -249,7 +271,8 @@ class RT(Plugin):
         entryid = max(mails, key=int)
         entry_dict = await self._entry(number, entryid)
         entry = '  \n'.join([f'{k}: {v}' for k, v in entry_dict.items()])
-        await evt.respond(f'{self.markdown_link(number)} history entry {entryid}:  \n{entry}')
+        await evt.respond(f'{self.markdown_link(number)} history entry {entryid}:  \n{entry}'
+                          f'  \n{self.take_this}')
 
     @rt.subcommand('show', aliases=('s', 'sh'), help='Show all information about the ticket.')
     @command.argument('number', 'ticket number', parser=str)
@@ -354,7 +377,6 @@ class RT(Plugin):
         if not self.can_manage(evt):
             return
         await evt.mark_read()
-        displayname = await self._displayname(evt.room_id, evt.sender)
         params = {'query': f'Status = "new" OR Status = "open"'}
         tickets_dict = await self._search(params)
         links = {k: f'<a href="{self.display}?id={k}">{v}</a>' for k, v in tickets_dict.items()}
@@ -363,9 +385,8 @@ class RT(Plugin):
             fbody = '<br/>'.join([f'<code>{k}</code>: {links[k]}' for k, v in tickets_dict.items()])
             content = TextMessageEventContent(
                 msgtype=MessageType.NOTICE, format=Format.HTML,
-                body=f'Open tickets for {displayname}:\n{body}',
-                formatted_body=f'Open tickets for <a href="https://matrix.to/#/{evt.sender}">'
-                f'{evt.sender}</a>:<br/>{fbody}')
+                body=f'Open tickets:\n{body}',
+                formatted_body=f'Open tickets:<br/>{fbody}')
             await evt.respond(content)
         else:
             await evt.respond('All done ✅')
