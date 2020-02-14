@@ -320,8 +320,8 @@ class RT(Plugin):
             f'<a href="https://matrix.to/#/{target_mxid}">{target_mxid}</a> 😜')
         await evt.respond(content)
 
-    @rt.subcommand('unowned', aliases=('u', 'un'), help='List all unowned open tickets.')
-    async def unowned(self, evt: MessageEvent) -> None:
+    @rt.subcommand('new', aliases=('n', 'new'), help='List all unowned new/open tickets.')
+    async def new(self, evt: MessageEvent) -> None:
         if not self.can_manage(evt):
             return
         await evt.mark_read()
@@ -341,6 +341,23 @@ class RT(Plugin):
         params = {'query': f'Owner = "{username}" AND ( Status = "new" OR Status = "open" )'}
         tickets_dict = await self._search(params)
         # links = {k: self.html_link(k) for k, v in tickets_dict.items()}
+        body = '\n'.join([f'{k}: {v}' for k, v in tickets_dict.items()])
+        fbody = '<br/>'.join([f'<code>{k}</code>: {v}' for k, v in tickets_dict.items()])
+        content = TextMessageEventContent(
+            msgtype=MessageType.NOTICE, format=Format.HTML,
+            body=f'Open tickets for {displayname}:\n{body}',
+            formatted_body=f'Open tickets for <a href="https://matrix.to/#/{evt.sender}">'
+            f'{evt.sender}</a>:<br/>{fbody}')
+        await evt.respond(content)
+
+    @rt.subcommand('unsolved', aliases=('u', 'un'), help='List all open tickets.')
+    async def unsolved(self, evt: MessageEvent) -> None:
+        if not self.can_manage(evt):
+            return
+        await evt.mark_read()
+        displayname = await self._displayname(evt.room_id, evt.sender)
+        params = {'query': f'Status = "new" OR Status = "open"'}
+        tickets_dict = await self._search(params)
         body = '\n'.join([f'{k}: {v}' for k, v in tickets_dict.items()])
         fbody = '<br/>'.join([f'<code>{k}</code>: {v}' for k, v in tickets_dict.items()])
         content = TextMessageEventContent(
