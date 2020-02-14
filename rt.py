@@ -29,6 +29,7 @@ class RT(Plugin):
     regex_properties = re.compile(r'([a-zA-z]+): (.+)')
     regex_history = re.compile(r'([0-9]+): (.+)')
     regex_entry = re.compile(r'([a-zA-z]+): (.+(?:\n {8}.*)*)', re.MULTILINE)
+    regex_assigner = re.compile(r'^.*?>(@.+:.+)<.*? assigned')
     take_this = f'(\U0001F44D this to take the ticket)'
     interesting = [
         'Ticket created',
@@ -163,7 +164,29 @@ class RT(Plugin):
                 msgtype=MessageType.NOTICE, format=Format.HTML,
                 body=f'{displayname} took {number}',
                 formatted_body=f'<a href="https://matrix.to/#/{evt.sender}">{evt.sender}</a> '
-                f'took <code>{target_ticket[0]}</code>')
+                f'took <code>{number}</code>')
+            await self.client.send_message(evt.room_id, content)
+
+    @command.passive(regex=r"(?:\U0001F595[\U0001F3FB-\U0001F3FF]?)",
+                     field=lambda evt: evt.content.relates_to.key,
+                     event_type=EventType.REACTION, msgtypes=None)
+    async def react_reject(self, evt: ReactionEvent, _: Tuple[str]) -> None:
+        displayname = await self._displayname(evt.room_id, evt.sender)
+        target_evt = await self.client.get_event(evt.room_id, evt.content.relates_to.event_id)
+        target_ticket = self.regex_ticket.findall(target_evt.content.body)
+        target_mxid = self.regex_assigner.findall(target_evt.content.formatted_body)[0]
+        target_username = target_mxid[1:].split(':')[0]
+        target_displayname = await self._displayname(evt.room_id, target_mxid)
+        if len(target_ticket) == 1:
+            number = target_ticket[0]
+            await self._edit(number, {'Owner': target_username})
+            content = TextMessageEventContent(
+                msgtype=MessageType.NOTICE, format=Format.HTML,
+                body=f'{displayname} politely rejected {number} and gave it back to '
+                     f'{target_displayname}',
+                formatted_body=f'<a href="https://matrix.to/#/{evt.sender}">{evt.sender}</a> '
+                f'politely rejected <code>{number}</code> and gave it back to '
+                f'<a href="https://matrix.to/#/{target_mxid}">{target_mxid}</a>')
             await self.client.send_message(evt.room_id, content)
 
     @command.new(name=lambda self: self.prefix,
@@ -328,12 +351,13 @@ class RT(Plugin):
         target_mxid = member_mxids[user]
         target_username = target_mxid[1:].split(':')[0]
         await self._edit(number, {'Owner': target_username})
+        react = f'(\U0001F44D to accept, \U0001F595 to reject)'
         content = TextMessageEventContent(
             msgtype=MessageType.NOTICE, format=Format.HTML,
-            body=f'{displayname} assigned rt#{number} to {user} 😜',
+            body=f'{displayname} assigned rt#{number} to {user} 😜 {react}',
             formatted_body=f'<a href="https://matrix.to/#/{evt.sender}">{evt.sender}</a> '
             f'assigned {self.html_link(number)} to '
-            f'<a href="https://matrix.to/#/{target_mxid}">{target_mxid}</a> 😜')
+            f'<a href="https://matrix.to/#/{target_mxid}">{target_mxid}</a> 😜 {react}')
         await evt.respond(content)
 
     @rt.subcommand('new', aliases=('n', 'new'), help='List all unowned new/open tickets.')
