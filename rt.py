@@ -147,7 +147,9 @@ class RT(Plugin):
             )
             msg_lines.append(markdown)
         if msg_lines:
-            await evt.respond('  \n'.join(msg_lines + [self.take_this]))
+            if len(msg_lines) == 1:
+                msg_lines += [self.take_this]
+            await evt.respond('  \n'.join(msg_lines))
 
     @command.passive(regex=r"(?:\U0001F44D[\U0001F3FB-\U0001F3FF]?)",
                      field=lambda evt: evt.content.relates_to.key,
@@ -367,7 +369,7 @@ class RT(Plugin):
         await evt.mark_read()
         params = {'query': 'Owner = "Nobody" AND ( Status = "new" OR Status = "open" )'}
         tickets_dict = await self._search(params)
-        links = {k: f'[v]({self.display}?id={k})' for k, v in tickets_dict.items()}
+        links = {k: f'[{v}]({self.display}?id={k})' for k, v in tickets_dict.items()}
         tickets = '  \n'.join([f'`{k}`: {links[k]}' for k, v in tickets_dict.items()])
         if tickets:
             await evt.respond(f'Unowned open tickets:  \n{tickets}')
