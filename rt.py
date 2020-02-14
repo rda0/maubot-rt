@@ -207,13 +207,6 @@ class RT(Plugin):
         await self._edit(number, {'Status': 'open', 'Queue': queue})
         await evt.respond(f'{self.markdown_link(number)} queued in **{queue}** 😐️')
 
-    @rt.subcommand('autoresolve', help='Ask the bot to automatically answer and resolve tickets.')
-    async def autoresolve(self, evt: MessageEvent) -> None:
-        if not self.can_manage(evt):
-            return
-        await evt.mark_read()
-        await evt.react('😂🤣🦄🌈')
-
     @rt.subcommand('comment', aliases=('c', 'com'), help='Add a comment.')
     @command.argument('number', 'ticket number', parser=str)
     @command.argument('comment', 'comment text', pass_raw=True)
@@ -236,7 +229,7 @@ class RT(Plugin):
 
     @rt.subcommand('entry', aliases=('e', 'ent'), help='Gets a single history entry.')
     @command.argument('number', 'ticket number', parser=str)
-    @command.argument('entryid', 'history entry number', parser=str)
+    @command.argument('entryid', 'entry number', parser=str)
     async def entry(self, evt: MessageEvent, number: str, entryid: str) -> None:
         if not self.can_manage(evt) or not self.valid_number(number):
             return
@@ -327,9 +320,12 @@ class RT(Plugin):
         await evt.mark_read()
         params = {'query': 'Owner = "Nobody" AND ( Status = "new" OR Status = "open" )'}
         tickets_dict = await self._search(params)
-        # links = {k: self.markdown_link(k) for k, v in tickets_dict.items()}
-        tickets = '  \n'.join([f'`{k}`: {v}' for k, v in tickets_dict.items()])
-        await evt.respond(f'Unowned open tickets:  \n{tickets}')
+        links = {k: f'[v]({self.display}?id={k})' for k, v in tickets_dict.items()}
+        tickets = '  \n'.join([f'`{k}`: {links[k]}' for k, v in tickets_dict.items()])
+        if tickets:
+            await evt.respond(f'Unowned open tickets:  \n{tickets}')
+        else:
+            await evt.respond('All done ✅')
 
     @rt.subcommand('mine', aliases=('m', 'my'), help='List all your open tickets.')
     async def mine(self, evt: MessageEvent) -> None:
@@ -340,15 +336,18 @@ class RT(Plugin):
         username = evt.sender[1:].split(':')[0]
         params = {'query': f'Owner = "{username}" AND ( Status = "new" OR Status = "open" )'}
         tickets_dict = await self._search(params)
-        # links = {k: self.html_link(k) for k, v in tickets_dict.items()}
-        body = '\n'.join([f'{k}: {v}' for k, v in tickets_dict.items()])
-        fbody = '<br/>'.join([f'<code>{k}</code>: {v}' for k, v in tickets_dict.items()])
-        content = TextMessageEventContent(
-            msgtype=MessageType.NOTICE, format=Format.HTML,
-            body=f'Open tickets for {displayname}:\n{body}',
-            formatted_body=f'Open tickets for <a href="https://matrix.to/#/{evt.sender}">'
-            f'{evt.sender}</a>:<br/>{fbody}')
-        await evt.respond(content)
+        links = {k: f'<a href="{self.display}?id={k}">{v}</a>' for k, v in tickets_dict.items()}
+        if tickets_dict:
+            body = '\n'.join([f'{k}: {v}' for k, v in tickets_dict.items()])
+            fbody = '<br/>'.join([f'<code>{k}</code>: {links[k]}' for k, v in tickets_dict.items()])
+            content = TextMessageEventContent(
+                msgtype=MessageType.NOTICE, format=Format.HTML,
+                body=f'Open tickets for {displayname}:\n{body}',
+                formatted_body=f'Open tickets for <a href="https://matrix.to/#/{evt.sender}">'
+                f'{evt.sender}</a>:<br/>{fbody}')
+            await evt.respond(content)
+        else:
+            await evt.respond('All done 🤙')
 
     @rt.subcommand('unsolved', aliases=('u', 'un'), help='List all open tickets.')
     async def unsolved(self, evt: MessageEvent) -> None:
@@ -358,11 +357,22 @@ class RT(Plugin):
         displayname = await self._displayname(evt.room_id, evt.sender)
         params = {'query': f'Status = "new" OR Status = "open"'}
         tickets_dict = await self._search(params)
-        body = '\n'.join([f'{k}: {v}' for k, v in tickets_dict.items()])
-        fbody = '<br/>'.join([f'<code>{k}</code>: {v}' for k, v in tickets_dict.items()])
-        content = TextMessageEventContent(
-            msgtype=MessageType.NOTICE, format=Format.HTML,
-            body=f'Open tickets for {displayname}:\n{body}',
-            formatted_body=f'Open tickets for <a href="https://matrix.to/#/{evt.sender}">'
-            f'{evt.sender}</a>:<br/>{fbody}')
-        await evt.respond(content)
+        links = {k: f'<a href="{self.display}?id={k}">{v}</a>' for k, v in tickets_dict.items()}
+        if tickets_dict:
+            body = '\n'.join([f'{k}: {v}' for k, v in tickets_dict.items()])
+            fbody = '<br/>'.join([f'<code>{k}</code>: {links[k]}' for k, v in tickets_dict.items()])
+            content = TextMessageEventContent(
+                msgtype=MessageType.NOTICE, format=Format.HTML,
+                body=f'Open tickets for {displayname}:\n{body}',
+                formatted_body=f'Open tickets for <a href="https://matrix.to/#/{evt.sender}">'
+                f'{evt.sender}</a>:<br/>{fbody}')
+            await evt.respond(content)
+        else:
+            await evt.respond('All done ✅')
+
+    @rt.subcommand('autoresolve', help='Ask the bot to automatically answer and resolve tickets.')
+    async def autoresolve(self, evt: MessageEvent) -> None:
+        if not self.can_manage(evt):
+            return
+        await evt.mark_read()
+        await evt.react('😂🤣🦄🌈')
