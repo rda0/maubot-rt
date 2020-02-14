@@ -117,6 +117,12 @@ class RT(Plugin):
             entry['Content'] = block
         return entry
 
+    async def _search(self, params: dict) -> dict:
+        rest = f'{self.rest}search/ticket'
+        async with self.http.get(rest, headers=self.headers, params=params) as response:
+            content = await response.text()
+        return dict(self.regex_history.findall(content))
+
     @command.passive('((^| )([rR][tT]#?))([0-9]+)', multiple=True)
     async def handler(self, evt: MessageEvent, subs: List[Tuple[str, str]]) -> None:
         await evt.mark_read()
@@ -312,4 +318,34 @@ class RT(Plugin):
             formatted_body=f'<a href="https://matrix.to/#/{evt.sender}">{evt.sender}</a> '
             f'assigned {self.html_link(number)} to '
             f'<a href="https://matrix.to/#/{target_mxid}">{target_mxid}</a> 😜')
+        await evt.respond(content)
+
+    @rt.subcommand('unowned', aliases=('u', 'un'), help='List all unowned open tickets.')
+    async def unowned(self, evt: MessageEvent) -> None:
+        if not self.can_manage(evt):
+            return
+        await evt.mark_read()
+        params = {'query': 'Owner = "Nobody" AND ( Status = "new" OR Status = "open" )'}
+        tickets_dict = await self._search(params)
+        # links = {k: self.markdown_link(k) for k, v in tickets_dict.items()}
+        tickets = '  \n'.join([f'`{k}`: {v}' for k, v in tickets_dict.items()])
+        await evt.respond(f'Unowned open tickets:  \n{tickets}')
+
+    @rt.subcommand('mine', aliases=('m', 'my'), help='List all your open tickets.')
+    async def mine(self, evt: MessageEvent) -> None:
+        if not self.can_manage(evt):
+            return
+        await evt.mark_read()
+        displayname = await self._displayname(evt.room_id, evt.sender)
+        username = evt.sender[1:].split(':')[0]
+        params = {'query': f'Owner = "{username}" AND ( Status = "new" OR Status = "open" )'}
+        tickets_dict = await self._search(params)
+        # links = {k: self.html_link(k) for k, v in tickets_dict.items()}
+        body = '\n'.join([f'{k}: {v}' for k, v in tickets_dict.items()])
+        fbody = '<br/>'.join([f'<code>{k}</code>: {v}' for k, v in tickets_dict.items()])
+        content = TextMessageEventContent(
+            msgtype=MessageType.NOTICE, format=Format.HTML,
+            body=f'Open tickets for {displayname}:\n{body}',
+            formatted_body=f'Open tickets for <a href="https://matrix.to/#/{evt.sender}">'
+            f'{evt.sender}</a>:<br/>{fbody}')
         await evt.respond(content)
