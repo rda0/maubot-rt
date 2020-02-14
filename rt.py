@@ -96,9 +96,10 @@ class RT(Plugin):
         data = {**self.login, **content}
         await self.http.post(rest, data=data, headers=self.headers)
 
-    async def _comment(self, number: str, comment: str) -> None:
+    async def _comment(self, number: str, action: str, text: str) -> None:
         rest = f'{self.rest}ticket/{number}/comment'
-        content = {'content': f'id: {number}\nAction: comment\nText: {comment}'}
+        multiline_text = text.replace('\n', '\n ')
+        content = {'content': f'id: {number}\nAction: {action}\nText: {multiline_text}'}
         data = {**self.login, **content}
         await self.http.post(rest, data=data, headers=self.headers)
 
@@ -245,23 +246,45 @@ class RT(Plugin):
 
     @rt.subcommand('queue', aliases=('q', 'que'), help='Put the ticket in queue.')
     @command.argument('number', 'ticket number', parser=str)
-    @command.argument('queue', 'queue', parser=str)
-    async def queue(self, evt: MessageEvent, number: str, queue: str) -> None:
+    @command.argument('qid', 'queue id', parser=str)
+    async def queue(self, evt: MessageEvent, number: str, qid: str) -> None:
         if not self.can_manage(evt) or not self.valid_number(number):
             return
         await evt.mark_read()
-        await self._edit(number, {'Status': 'open', 'Queue': queue})
-        await evt.respond(f'{self.markdown_link(number)} queued in **{queue}** 😐️ {self.take_this}')
+        await self._edit(number, {'Status': 'open', 'Queue': qid})
+        await evt.respond(f'{self.markdown_link(number)} queued in **{qid}** 😐️ {self.take_this}')
 
     @rt.subcommand('comment', aliases=('c', 'com'), help='Add a comment.')
     @command.argument('number', 'ticket number', parser=str)
-    @command.argument('comment', 'comment text', pass_raw=True)
-    async def comment(self, evt: MessageEvent, number: str, comment: str) -> None:
+    @command.argument('text', 'comment text', pass_raw=True)
+    async def comment(self, evt: MessageEvent, number: str, text: str) -> None:
         if not self.can_manage(evt) or not self.valid_number(number):
             return
         await evt.mark_read()
-        await self._comment(number, comment)
-        await evt.respond(f'{self.markdown_link(number)} comment added 🤓 {self.take_this}')
+        await self._comment(number, 'comment', text)
+        displayname = await self._displayname(evt.room_id, evt.sender)
+        content = TextMessageEventContent(
+            msgtype=MessageType.NOTICE, format=Format.HTML,
+            body=f'{displayname} commented 🤓 on {number} {self.take_this}',
+            formatted_body=f'<a href="https://matrix.to/#/{evt.sender}">{evt.sender}</a> '
+            f'commented 🤓 on <code>{number}</code> {self.take_this}')
+        await evt.respond(content)
+
+    @rt.subcommand('reply', aliases=('re', 'rep'), help='Reply to requestor(s).')
+    @command.argument('number', 'ticket number', parser=str)
+    @command.argument('text', 'reply text', pass_raw=True)
+    async def reply(self, evt: MessageEvent, number: str, text: str) -> None:
+        if not self.can_manage(evt) or not self.valid_number(number):
+            return
+        await evt.mark_read()
+        await self._comment(number, 'correspond', text)
+        displayname = await self._displayname(evt.room_id, evt.sender)
+        content = TextMessageEventContent(
+            msgtype=MessageType.NOTICE, format=Format.HTML,
+            body=f'{displayname} replied 📨 to {number} {self.take_this}',
+            formatted_body=f'<a href="https://matrix.to/#/{evt.sender}">{evt.sender}</a> '
+            f'replied 📨 to <code>{number}</code> {self.take_this}')
+        await evt.respond(content)
 
     @rt.subcommand('history', aliases=('h', 'hist'), help='Get a list of all history entries.')
     @command.argument('number', 'ticket number', parser=str)
