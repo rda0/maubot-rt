@@ -150,7 +150,7 @@ class RT(Plugin):
         if msg_lines:
             if len(msg_lines) == 1:
                 msg_lines += [self.take_this]
-            await evt.respond('  \n'.join(msg_lines))
+            await evt.respond('\n\n'.join(msg_lines))
 
     @command.passive(regex=r"(?:\U0001F44D[\U0001F3FB-\U0001F3FF]?)",
                      field=lambda evt: evt.content.relates_to.key,
