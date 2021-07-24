@@ -14,6 +14,7 @@ class Config(BaseProxyConfig):
         helper.copy('user')
         helper.copy('pass')
         helper.copy('whitelist')
+        helper.copy('usermap')
         helper.copy('filter_properties')
         helper.copy('filter_entry')
 
@@ -21,6 +22,7 @@ class Config(BaseProxyConfig):
 class RT(Plugin):
     prefix: str
     whitelist: Set[UserID]
+    usermap: dict
     api: str
     login: dict
     headers = {'User-agent': 'maubot-rt'}
@@ -44,6 +46,7 @@ class RT(Plugin):
         self.config.load_and_update()
         self.prefix = self.config['prefix']
         self.whitelist = set(self.config['whitelist'])
+        self.usermap = self.config['usermap']
         self.url = self.config['url']
         self.rest = f'{self.url}/REST/1.0/'
         self.display = f'{self.url}/Ticket/Display.html'
@@ -57,6 +60,9 @@ class RT(Plugin):
 
     def can_manage(self, evt: MessageEvent) -> bool:
         return True if evt.sender in self.whitelist else False
+
+    def map_user(self, username: str) -> str:
+        return self.usermap[username] if username in self.usermap else username
 
     def valid_number(self, number: str) -> bool:
         return True if self.regex_number.match(number) else False
@@ -162,7 +168,7 @@ class RT(Plugin):
         target_ticket = self.regex_ticket.findall(target_evt.content.body)
         if len(target_ticket) == 1:
             number = target_ticket[0]
-            await self._edit(number, {'Owner': username})
+            await self._edit(number, {'Owner': self.map_user(username)})
             content = TextMessageEventContent(
                 msgtype=MessageType.NOTICE, format=Format.HTML,
                 body=f'{displayname} took {number}',
@@ -182,7 +188,7 @@ class RT(Plugin):
         target_displayname = await self._displayname(evt.room_id, target_mxid)
         if len(target_ticket) == 1:
             number = target_ticket[0]
-            await self._edit(number, {'Owner': target_username})
+            await self._edit(number, {'Owner': self.map_user(target_username)})
             content = TextMessageEventContent(
                 msgtype=MessageType.NOTICE, format=Format.HTML,
                 body=f'{displayname} politely rejected {number} and gave it back to '
@@ -348,7 +354,8 @@ class RT(Plugin):
             return
         await evt.mark_read()
         displayname = await self._displayname(evt.room_id, evt.sender)
-        await self._edit(number, {'Owner': evt.sender[1:].split(':')[0]})
+        username = evt.sender[1:].split(':')[0]
+        await self._edit(number, {'Owner': self.map_user(username)})
         content = TextMessageEventContent(
             msgtype=MessageType.NOTICE, format=Format.HTML,
             body=f'{displayname} took rt#{number} 👍️',
@@ -375,7 +382,7 @@ class RT(Plugin):
         displayname = await self._displayname(evt.room_id, evt.sender)
         target_mxid = member_mxids[user]
         target_username = target_mxid[1:].split(':')[0]
-        await self._edit(number, {'Owner': target_username})
+        await self._edit(number, {'Owner': self.map_user(target_username)})
         react = f'(\U0001F44D to accept, \U0001F595 to reject)'
         content = TextMessageEventContent(
             msgtype=MessageType.NOTICE, format=Format.HTML,
@@ -406,7 +413,8 @@ class RT(Plugin):
         await evt.mark_read()
         displayname = await self._displayname(evt.room_id, evt.sender)
         username = evt.sender[1:].split(':')[0]
-        params = {'query': f'Owner = "{username}" AND ( Status = "new" OR Status = "open" )'}
+        mapped_username = self.map_user(username)
+        params = {'query': f'Owner = "{mapped_username}" AND ( Status = "new" OR Status = "open" )'}
         tickets_dict = await self._search(params)
         links = {k: f'<a href="{self.display}?id={k}">{v}</a>' for k, v in tickets_dict.items()}
         if tickets_dict:

@@ -10,6 +10,9 @@ pass: secret
 # The list of user IDs who are allowed to use commands
 whitelist:
 - '@user:example.com'
+# Map Matrix users to RT users
+usermap:
+  user: rt-userid
 # List of ticket properties to show
 filter_properties:
 - 'Queue'
