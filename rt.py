@@ -363,6 +363,21 @@ class RT(Plugin):
             f'took {self.html_link(number)} 👍️')
         await evt.respond(content)
 
+    @rt.subcommand('disown', aliases=('di', 'dis'), help='Disown a ticket.')
+    @command.argument('number', 'ticket number', parser=str)
+    async def take(self, evt: MessageEvent, number: str) -> None:
+        if not self.can_manage(evt) or not self.valid_number(number):
+            return
+        await evt.mark_read()
+        displayname = await self._displayname(evt.room_id, evt.sender)
+        await self._edit(number, {'Owner': 'Nobody'})
+        content = TextMessageEventContent(
+            msgtype=MessageType.NOTICE, format=Format.HTML,
+            body=f'{displayname} disowned rt#{number} 👎️',
+            formatted_body=f'<a href="https://matrix.to/#/{evt.sender}">{evt.sender}</a> '
+            f'disowned {self.html_link(number)} 👎️')
+        await evt.respond(content)
+
     @rt.subcommand('give', aliases=('g', 'gi', 'assign'), help='Give the ticket to somebody.')
     @command.argument('number', 'ticket number', parser=str)
     @command.argument('user', 'matrix user', parser=str)
